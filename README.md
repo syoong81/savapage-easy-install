@@ -50,6 +50,11 @@ The machine must be 64-bit Intel/AMD (x86_64). Raspberry Pi / ARM is not support
 | `uninstall-savapage.sh` | The uninstall script. It backs up your data, removes SavaPage and checks the machine is clean for a reinstall. |
 | `INSTALL-VM.md` | Step-by-step guide for a physical machine or a VM |
 | `INSTALL-LXC.md` | Step-by-step guide for a Proxmox LXC container |
+| `LICENSE` | MIT License for these scripts and guides |
+
+## License
+
+The scripts and guides in this repository are released under the [MIT License](LICENSE). That license covers **only this repository**. SavaPage itself, which the script downloads, is licensed separately under the [GNU AGPL v3](https://www.gnu.org/licenses/agpl-3.0.html).
 
 ---
 
