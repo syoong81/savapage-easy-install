@@ -1,4 +1,4 @@
-# SavaPage Installer for Debian / Ubuntu
+# SavaPage Easy Installer/Uninstaller for Debian / Ubuntu
 
 A one-step install script for the [SavaPage](https://www.savapage.org/) print server (version **1.7.0**).
 
