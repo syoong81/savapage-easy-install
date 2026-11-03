@@ -9,7 +9,7 @@ Use this guide for a **physical PC/server** or a **virtual machine** (Proxmox VM
 1. [What you need](#1-what-you-need)
 2. [Open a terminal on the server](#2-open-a-terminal-on-the-server)
 3. [Find the server's IP address](#3-find-the-servers-ip-address)
-4. [Copy the script to the server](#4-copy-the-script-to-the-server)
+4. [Get the scripts onto the server](#4-get-the-scripts-onto-the-server)
 5. [Run the installer](#5-run-the-installer)
 6. [Log in and change the password](#6-log-in-and-change-the-password)
 7. [After installation](#7-after-installation)
@@ -69,67 +69,89 @@ The first number (e.g. `192.168.1.50`) is the server's IP address. **Write it do
 
 ---
 
-## 4. Copy the script to the server
+## 4. Get the scripts onto the server
 
-You need `install-savapage.sh` on the server. Choose **one** method.
+Choose **one** method. **Option A (GitHub) is recommended.** It needs nothing from your PC, and it's the easiest way to get updates later.
 
-### Option A: PowerShell (built into Windows 10/11)
+### Option A: Clone from GitHub (recommended)
 
-1. Open the folder holding `install-savapage.sh` in File Explorer.
-2. Click the address bar, type `powershell` and press **Enter**. A PowerShell window opens in that folder.
-3. Run this, replacing `youruser` and `SERVER-IP`:
-
-   ```bash
-   scp install-savapage.sh youruser@SERVER-IP:~
-   ```
-
-4. Type `yes` if asked to trust the computer, then enter your Linux password.
-
-The file is now in your home folder on the server (`~/install-savapage.sh`).
-
-### Option B: WinSCP (drag and drop)
-
-1. Download and install [WinSCP](https://winscp.net/).
-2. Start a **New Session** with **File protocol** `SFTP`, **Host name** `SERVER-IP`, and your Linux **User name** and **Password**. Click **Login**.
-3. Drag `install-savapage.sh` from the left (your PC) into your home folder on the right (the server).
-
-### Option C: USB stick
-
-1. Copy `install-savapage.sh` onto a USB stick and plug it into the server.
-2. On the server, find the stick with `lsblk`. It's usually `sdb1`.
-3. Mount it and copy the file:
-
-   ```bash
-   sudo mount /dev/sdb1 /mnt && cp /mnt/install-savapage.sh ~ && sudo umount /mnt
-   ```
-
-### Option D: Paste it
-
-On the server, run `nano ~/install-savapage.sh`, then paste the whole script, press **Ctrl + O** and **Enter** to save, and **Ctrl + X** to exit. (This doesn't work in the Proxmox noVNC console. Use SSH or the xterm.js console instead.)
-
-### Option E: Clone the GitHub repository (alternative install method)
-
-This downloads the install script, the uninstall script and the guides straight onto the server. Nothing needs copying from your PC. On the server, run these one at a time.
-
-Install git:
+In the terminal on the server (step 2), install git:
 
 ```bash
 sudo apt-get update && sudo apt-get install -y git
 ```
 
-Download the repository:
+Then download the scripts and guides:
 
 ```bash
 git clone https://github.com/syoong81/savapage-easy-install.git ~/savapage-easy-install
 ```
 
-Run the installer:
+The scripts are now in `~/savapage-easy-install/`. Continue with [step 5](#5-run-the-installer).
+
+To get the newest version of the scripts later:
+
+```bash
+cd ~/savapage-easy-install && git pull
+```
+
+### Option B: PowerShell (built into Windows 10/11)
+
+1. Download the scripts to your PC from [the GitHub page](https://github.com/syoong81/savapage-easy-install) (**Code → Download ZIP**), and unzip them.
+2. Open the unzipped folder in File Explorer, click the address bar, type `powershell` and press **Enter**. A PowerShell window opens in that folder.
+3. Run this, replacing `youruser` and `SERVER-IP`:
+
+   ```bash
+   scp install-savapage.sh uninstall-savapage.sh youruser@SERVER-IP:~
+   ```
+
+4. Type `yes` if asked to trust the computer, then enter your Linux password.
+
+The scripts are now in your home folder on the server (`~/`).
+
+### Option C: WinSCP (drag and drop)
+
+1. Download the scripts to your PC as in Option B, step 1.
+2. Download and install [WinSCP](https://winscp.net/).
+3. Start a **New Session** with **File protocol** `SFTP`, **Host name** `SERVER-IP`, and your Linux **User name** and **Password**. Click **Login**.
+4. Drag `install-savapage.sh` and `uninstall-savapage.sh` from the left (your PC) into your home folder on the right (the server).
+
+### Option D: SSH into the server and paste the script
+
+1. Connect from your PC with `ssh youruser@SERVER-IP` (see step 2).
+2. Open [install-savapage.sh on GitHub](https://github.com/syoong81/savapage-easy-install/blob/main/install-savapage.sh), click the **Copy raw file** button, then run this in the SSH window:
+
+   ```bash
+   nano ~/install-savapage.sh
+   ```
+
+3. Paste with a **right-click** (or **Ctrl + Shift + V**). Then press **Ctrl + O** and **Enter** to save, and **Ctrl + X** to exit.
+
+The Proxmox noVNC console can't paste, so use SSH for this option.
+
+---
+
+## 5. Run the installer
+
+On the server, run the command that matches how you got the scripts:
+
+| You used… | Run |
+|---|---|
+| **Option A** (GitHub) | `sudo bash ~/savapage-easy-install/install-savapage.sh` |
+| **Options B, C or D** | `sudo bash ~/install-savapage.sh` |
+
+For example, after cloning from GitHub:
 
 ```bash
 sudo bash ~/savapage-easy-install/install-savapage.sh
 ```
 
-That last command replaces step 5. Skip ahead to [step 6](#6-log-in-and-change-the-password) when it finishes.
+- Enter your password when asked.
+- It takes **about 5–10 minutes**. The SavaPage download is about 150 MB.
+- **Don't close the window** while it runs.
+- When it's done, you'll see a box saying **"SavaPage 1.7.0-final is installed"** with the web addresses to use.
+
+A yellow `[!]` line is a warning; the install continues. A red `[x]` line means the script stopped. See [Troubleshooting](#troubleshooting).
 
 **With install options.** Put any of the [options](#options) after `sudo` and before `bash`. For example:
 
@@ -151,34 +173,7 @@ Combine options, separated by spaces:
 sudo HTTPS_REDIRECT=1 SKIP_FIREWALL=1 bash ~/savapage-easy-install/install-savapage.sh
 ```
 
-**To uninstall later** ([details](#the-easy-way-the-uninstall-script)):
-
-```bash
-sudo bash ~/savapage-easy-install/uninstall-savapage.sh
-```
-
-**To get the newest version of the scripts later:**
-
-```bash
-cd ~/savapage-easy-install && git pull
-```
-
----
-
-## 5. Run the installer
-
-On the server, run:
-
-```bash
-sudo bash ~/install-savapage.sh
-```
-
-- Enter your password when asked.
-- It takes **about 5–10 minutes**. The SavaPage download is about 150 MB.
-- **Don't close the window** while it runs.
-- When it's done, you'll see a box saying **"SavaPage 1.7.0-final is installed"** with the web addresses to use.
-
-A yellow `[!]` line is a warning; the install continues. A red `[x]` line means the script stopped. See [Troubleshooting](#troubleshooting).
+If you used Options B–D, use `~/install-savapage.sh` in these commands instead.
 
 ---
 
@@ -260,7 +255,7 @@ Put these before `bash` on the command line:
 Example:
 
 ```bash
-sudo HTTPS_REDIRECT=1 bash ~/install-savapage.sh
+sudo HTTPS_REDIRECT=1 bash ~/savapage-easy-install/install-savapage.sh
 ```
 
 ## Redirect HTTP to HTTPS (optional)
@@ -278,7 +273,7 @@ The redirect is **off by default**. When it's on, anyone who opens `http://SERVE
 **Turn it on during install:**
 
 ```bash
-sudo HTTPS_REDIRECT=1 bash ~/install-savapage.sh
+sudo HTTPS_REDIRECT=1 bash ~/savapage-easy-install/install-savapage.sh
 ```
 
 **Turn it on later.** Open the config file:
@@ -401,7 +396,7 @@ Files:
 | Problem | Fix |
 |---|---|
 | `bash\r: No such file or directory` | The file got Windows line endings. Run `sed -i 's/\r$//' ~/install-savapage.sh` and try again. |
-| `Run this script as root` | You forgot `sudo`. Run `sudo bash ~/install-savapage.sh`. |
+| `Run this script as root` | You forgot `sudo`. Run `sudo bash ~/savapage-easy-install/install-savapage.sh` (or `~/install-savapage.sh` if you copied it). |
 | `A user named 'savapage' already exists` | Your own login account is called `savapage`. Create a new admin user, then remove or rename the old one. Or reinstall the OS with a different user name. The script changed nothing. |
 | `is not a supported version` (yellow) | Your OS version hasn't been tested. The install continues, but use Debian 12/13 or Ubuntu 26.04 if anything breaks. |
 | `x86_64 only` | The machine's processor isn't supported. See [What you need](#1-what-you-need). |
@@ -427,10 +422,10 @@ This removes SavaPage **and all of its data**: users, print history and settings
 
 ### The easy way: the uninstall script
 
-Copy `uninstall-savapage.sh` to the server, the same way as the install script ([step 4](#4-copy-the-script-to-the-server)). If you cloned the repository, it's already in `~/savapage-easy-install/`. Then run:
+If you cloned from GitHub (recommended), the uninstall script is already in `~/savapage-easy-install/`. If you copied the scripts with PowerShell or WinSCP instead, it is `~/uninstall-savapage.sh`. Run:
 
 ```bash
-sudo bash ~/uninstall-savapage.sh
+sudo bash ~/savapage-easy-install/uninstall-savapage.sh
 ```
 
 Type **`yes`** to confirm. The script:
@@ -452,7 +447,7 @@ Type **`yes`** to confirm. The script:
    [PASS] CUPS still running (needed for reinstall)
    ```
 
-If every line says PASS, reinstall any time with `sudo bash ~/install-savapage.sh`. You can also run the uninstall script on a machine without SavaPage just to run the checks.
+If every line says PASS, reinstall any time with `sudo bash ~/savapage-easy-install/install-savapage.sh`. You can also run the uninstall script on a machine without SavaPage just to run the checks.
 
 **Options** (put them before `bash`):
 
@@ -466,7 +461,7 @@ If every line says PASS, reinstall any time with `sudo bash ~/install-savapage.s
 Example, to remove everything the install script added:
 
 ```bash
-sudo RESTORE_CUPS=1 REMOVE_FIREWALL_RULES=1 bash ~/uninstall-savapage.sh
+sudo RESTORE_CUPS=1 REMOVE_FIREWALL_RULES=1 bash ~/savapage-easy-install/uninstall-savapage.sh
 ```
 
 To turn the firewall off completely as well:

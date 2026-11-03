@@ -10,8 +10,8 @@ Use this guide to run SavaPage in a **Proxmox LXC container**. For a physical ma
 
 1. [Download the Debian 13 template](#1-download-the-debian-13-template)
 2. [Create the container](#2-create-the-container)
-3. [Copy the script to the Proxmox host](#3-copy-the-script-to-the-proxmox-host)
-4. [Copy the script into the container and run it](#4-copy-the-script-into-the-container-and-run-it)
+3. [Get the scripts into the container](#3-get-the-scripts-into-the-container)
+4. [Run the installer](#4-run-the-installer)
 5. [Log in and change the password](#5-log-in-and-change-the-password)
 6. [(Optional) Proxmox firewall rules](#6-optional-proxmox-firewall-rules)
 7. [Next steps](#7-next-steps)
@@ -79,35 +79,13 @@ pct create 120 local:vztmpl/debian-13-standard_13.x-x_amd64.tar.zst --hostname s
 
 ---
 
-## 3. Copy the script to the Proxmox host
+## 3. Get the scripts into the container
 
-The easiest route is to put `install-savapage.sh` on the **Proxmox host** first, then push it into the container from there in step 4. Choose **one** method.
+Choose **one** method. **Option A (GitHub) is recommended.** It needs nothing from your PC, and it's the easiest way to get updates later.
 
-### Option A: PowerShell (built into Windows 10/11)
+The commands below run in the **Proxmox host shell** (**Node → Shell** in the web UI). Replace `120` with your container ID.
 
-1. Open the folder holding `install-savapage.sh` in File Explorer.
-2. Click the address bar, type `powershell` and press **Enter**.
-3. Run this, replacing `PROXMOX-IP` with your Proxmox host's IP (the one you use for the web UI, without `:8006`):
-
-   ```bash
-   scp install-savapage.sh root@PROXMOX-IP:/root/
-   ```
-
-4. Type `yes` if asked to trust the computer, then enter the Proxmox **root** password.
-
-### Option B: WinSCP (drag and drop)
-
-1. Download and install [WinSCP](https://winscp.net/).
-2. Start a **New Session** with **File protocol** `SFTP`, **Host name** `PROXMOX-IP`, **User name** `root`, and the Proxmox root password. Click **Login**.
-3. Drag `install-savapage.sh` into `/root/` on the right.
-
-### Option C: Straight into the container (skips the host)
-
-The Debian template has an SSH server, but it doesn't allow root password logins. Either add an SSH key for root inside the container, or create a normal user there first. Options A and B are simpler.
-
-### Option D: Clone the GitHub repository (alternative install method)
-
-This downloads the scripts and guides straight into the container. Nothing needs copying from your PC, so you can skip step 4. On the Proxmox host shell, run these one at a time. Replace `120` with your container ID.
+### Option A: Clone from GitHub (recommended)
 
 Install git in the container:
 
@@ -115,65 +93,106 @@ Install git in the container:
 pct exec 120 -- bash -c 'apt-get update && apt-get install -y git'
 ```
 
-Download the repository into the container:
+Download the scripts and guides into the container:
 
 ```bash
 pct exec 120 -- git clone https://github.com/syoong81/savapage-easy-install.git /root/savapage-easy-install
 ```
 
-Run the installer:
+The scripts are now in `/root/savapage-easy-install/` inside the container. Continue with [step 4](#4-run-the-installer).
 
-```bash
-pct exec 120 -- bash /root/savapage-easy-install/install-savapage.sh
-```
-
-You can also type the same commands, without `pct exec 120 --`, in the container's own **Console** while logged in as root. When it finishes, continue with [step 5](#5-log-in-and-change-the-password).
-
-**With install options.** Through `pct exec`, put the [options](#options) after `env` and before `bash`. For example, to turn on the HTTP-to-HTTPS redirect:
-
-```bash
-pct exec 120 -- env HTTPS_REDIRECT=1 bash /root/savapage-easy-install/install-savapage.sh
-```
-
-In the container's own Console, leave out `pct exec 120 -- env`:
-
-```bash
-HTTPS_REDIRECT=1 bash /root/savapage-easy-install/install-savapage.sh
-```
-
-**To uninstall later** ([details](#keep-the-container-remove-only-savapage-the-uninstall-script)):
-
-```bash
-pct exec 120 -- env ASSUME_YES=1 bash /root/savapage-easy-install/uninstall-savapage.sh
-```
-
-**To get the newest version of the scripts later:**
+To get the newest version of the scripts later:
 
 ```bash
 pct exec 120 -- git -C /root/savapage-easy-install pull
 ```
 
+### Option B: PowerShell (built into Windows 10/11)
+
+This copies the scripts from your PC to the Proxmox host, then into the container.
+
+1. Download the scripts to your PC from [the GitHub page](https://github.com/syoong81/savapage-easy-install) (**Code → Download ZIP**), and unzip them.
+2. Open the unzipped folder in File Explorer, click the address bar, type `powershell` and press **Enter**.
+3. Run this, replacing `PROXMOX-IP` with your Proxmox host's IP (the one you use for the web UI, without `:8006`):
+
+   ```bash
+   scp install-savapage.sh uninstall-savapage.sh root@PROXMOX-IP:/root/
+   ```
+
+4. Type `yes` if asked to trust the computer, then enter the Proxmox **root** password.
+5. In the Proxmox host shell, push both scripts into the container. First the install script:
+
+   ```bash
+   pct push 120 /root/install-savapage.sh /root/install-savapage.sh
+   ```
+
+   Then the uninstall script:
+
+   ```bash
+   pct push 120 /root/uninstall-savapage.sh /root/uninstall-savapage.sh
+   ```
+
+### Option C: WinSCP (drag and drop)
+
+1. Download the scripts to your PC as in Option B, step 1.
+2. Download and install [WinSCP](https://winscp.net/).
+3. Start a **New Session** with **File protocol** `SFTP`, **Host name** `PROXMOX-IP`, **User name** `root`, and the Proxmox root password. Click **Login**.
+4. Drag `install-savapage.sh` and `uninstall-savapage.sh` into `/root/` on the right.
+5. Push both scripts into the container with the two `pct push` commands from Option B, step 5.
+
+### Option D: SSH into the container and paste the script
+
+The container doesn't accept root password logins over SSH, so go in through the Proxmox host.
+
+1. From your PC, connect to the Proxmox host:
+
+   ```bash
+   ssh root@PROXMOX-IP
+   ```
+
+2. Open a root shell inside the container:
+
+   ```bash
+   pct enter 120
+   ```
+
+3. Open [install-savapage.sh on GitHub](https://github.com/syoong81/savapage-easy-install/blob/main/install-savapage.sh) and click the **Copy raw file** button. Then, in the SSH window, run:
+
+   ```bash
+   nano /root/install-savapage.sh
+   ```
+
+4. Paste with a **right-click** (or **Ctrl + Shift + V**). Press **Ctrl + O** and **Enter** to save, and **Ctrl + X** to exit.
+5. Type `exit` to leave the container.
+
 ---
 
-## 4. Copy the script into the container and run it
+## 4. Run the installer
 
-Open the Proxmox host shell (**Node → Shell**). Replace `120` with your container ID.
+In the Proxmox host shell, run the command that matches how you got the scripts. It takes **about 5–10 minutes**. Don't close the shell.
 
-**Copy the script in:**
+| You used… | Run |
+|---|---|
+| **Option A** (GitHub) | `pct exec 120 -- bash /root/savapage-easy-install/install-savapage.sh` |
+| **Options B, C or D** | `pct exec 120 -- bash /root/install-savapage.sh` |
+
+For example, after cloning from GitHub:
 
 ```bash
-pct push 120 /root/install-savapage.sh /root/install-savapage.sh
-```
-
-**Run it inside the container.** It takes about 5–10 minutes. Don't close the shell.
-
-```bash
-pct exec 120 -- bash /root/install-savapage.sh
+pct exec 120 -- bash /root/savapage-easy-install/install-savapage.sh
 ```
 
 When it's done, you'll see a box saying **"SavaPage 1.7.0-final is installed"** with the container's web addresses.
 
 A yellow `[!]` line is a warning; the install continues. In a container you'll always see *"Firewall skipped (LXC)"*, which is expected. A red `[x]` line means the script stopped. See [Troubleshooting](#troubleshooting).
+
+**With install options.** Put the [options](#options) after `env` and before `bash`. For example, to turn on the HTTP-to-HTTPS redirect:
+
+```bash
+pct exec 120 -- env HTTPS_REDIRECT=1 bash /root/savapage-easy-install/install-savapage.sh
+```
+
+If you used Options B–D, use `/root/install-savapage.sh` instead.
 
 **Find the container's IP** (if you missed it in the output):
 
@@ -181,7 +200,7 @@ A yellow `[!]` line is a warning; the install continues. In a container you'll a
 pct exec 120 -- hostname -I
 ```
 
-> You can also run the script from the container's own **Console** in the Proxmox UI: log in as `root` and run `bash /root/install-savapage.sh`. You're already root there, so `sudo` isn't needed.
+> You can also run the installer from inside the container, from its **Console** in the Proxmox UI or after `pct enter 120`. Leave out `pct exec 120 --` and `env`, e.g. `HTTPS_REDIRECT=1 bash /root/savapage-easy-install/install-savapage.sh`. You're root there, so `sudo` isn't needed.
 
 ---
 
@@ -254,7 +273,7 @@ Everything else (Java 21, CUPS locked to the container itself, the checksum-veri
 Put these in front of `bash`. For example, to turn on the HTTP-to-HTTPS redirect:
 
 ```bash
-pct exec 120 -- env HTTPS_REDIRECT=1 bash /root/install-savapage.sh
+pct exec 120 -- env HTTPS_REDIRECT=1 bash /root/savapage-easy-install/install-savapage.sh
 ```
 
 | Variable | Default | Effect |
@@ -290,13 +309,15 @@ The easiest way is to delete the container: **Container → More → Remove**. B
 
 ### Keep the container, remove only SavaPage: the uninstall script
 
-Run these on the Proxmox host. First copy `uninstall-savapage.sh` into the container, the same way as the install script (steps 3 and 4). Skip this if you cloned the repository; it's already in `/root/savapage-easy-install/`.
+Run this on the Proxmox host. `ASSUME_YES=1` is needed with `pct exec`, because there's no way to type `yes` there.
+
+If you cloned from GitHub (recommended):
 
 ```bash
-pct push 120 /root/uninstall-savapage.sh /root/uninstall-savapage.sh
+pct exec 120 -- env ASSUME_YES=1 bash /root/savapage-easy-install/uninstall-savapage.sh
 ```
 
-Then run it. `ASSUME_YES=1` is needed with `pct exec`, because there's no way to type `yes` there.
+If you copied the scripts with PowerShell or WinSCP (Options B or C in [step 3](#3-get-the-scripts-into-the-container)):
 
 ```bash
 pct exec 120 -- env ASSUME_YES=1 bash /root/uninstall-savapage.sh
@@ -314,7 +335,7 @@ Copy the backup out to the Proxmox host. Use the file name the script printed:
 pct pull 120 /root/savapage-backup-DATE.tar.gz /root/savapage-backup-DATE.tar.gz
 ```
 
-When every check says PASS, you can reinstall at any time with step 4. For the other options (`SKIP_BACKUP=1`, `RESTORE_CUPS=1`), see the [VM guide](INSTALL-VM.md#the-easy-way-the-uninstall-script). Put them after `env`.
+When every check says PASS, you can reinstall at any time with [step 4](#4-run-the-installer). For the other options (`SKIP_BACKUP=1`, `RESTORE_CUPS=1`), see the [VM guide](INSTALL-VM.md#the-easy-way-the-uninstall-script). Put them after `env`.
 
 <details>
 <summary>Manual uninstall in one command, without the script</summary>

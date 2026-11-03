@@ -26,9 +26,9 @@ The setup isn't tied to any particular network, so you can set it up at one loca
 
 ## Getting the files
 
-Either download the files and copy them to your server (each guide explains how), or clone this repository straight onto the server.
+**Recommended: clone this repository straight onto the server.** It needs nothing from your PC, and `git pull` gets you updates later. The guides also explain three other ways: copying the files with PowerShell, copying them with WinSCP, or pasting the script over SSH.
 
-First install git:
+On a physical machine or VM, first install git:
 
 ```bash
 sudo apt-get update && sudo apt-get install -y git
@@ -40,7 +40,7 @@ Then clone the repository and run the installer:
 git clone https://github.com/syoong81/savapage-easy-install.git ~/savapage-easy-install && sudo bash ~/savapage-easy-install/install-savapage.sh
 ```
 
-Install options go between `sudo` and `bash`, e.g. `sudo HTTPS_REDIRECT=1 bash …`. For all the options, and for the Proxmox container commands, see the [VM guide](INSTALL-VM.md#option-e-clone-the-github-repository-alternative-install-method) or the [LXC guide](INSTALL-LXC.md#option-d-clone-the-github-repository-alternative-install-method).
+Install options go between `sudo` and `bash`, e.g. `sudo HTTPS_REDIRECT=1 bash …`. For all the options, see the [VM guide](INSTALL-VM.md#option-a-clone-from-github-recommended). For the Proxmox container commands, see the [LXC guide](INSTALL-LXC.md#option-a-clone-from-github-recommended).
 
 ## Supported systems
 
