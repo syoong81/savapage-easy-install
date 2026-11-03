@@ -131,7 +131,33 @@ sudo bash ~/savapage-easy-install/install-savapage.sh
 
 That last command replaces step 5. Skip ahead to [step 6](#6-log-in-and-change-the-password) when it finishes.
 
-To get the newest version of the scripts later:
+**With install options.** Put any of the [options](#options) after `sudo` and before `bash`. For example:
+
+Turn on the HTTP-to-HTTPS redirect:
+
+```bash
+sudo HTTPS_REDIRECT=1 bash ~/savapage-easy-install/install-savapage.sh
+```
+
+Leave the firewall alone (you manage it yourself):
+
+```bash
+sudo SKIP_FIREWALL=1 bash ~/savapage-easy-install/install-savapage.sh
+```
+
+Combine options, separated by spaces:
+
+```bash
+sudo HTTPS_REDIRECT=1 SKIP_FIREWALL=1 bash ~/savapage-easy-install/install-savapage.sh
+```
+
+**To uninstall later** ([details](#the-easy-way-the-uninstall-script)):
+
+```bash
+sudo bash ~/savapage-easy-install/uninstall-savapage.sh
+```
+
+**To get the newest version of the scripts later:**
 
 ```bash
 cd ~/savapage-easy-install && git pull

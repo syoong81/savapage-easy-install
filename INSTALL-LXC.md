@@ -129,7 +129,25 @@ pct exec 120 -- bash /root/savapage-easy-install/install-savapage.sh
 
 You can also type the same commands, without `pct exec 120 --`, in the container's own **Console** while logged in as root. When it finishes, continue with [step 5](#5-log-in-and-change-the-password).
 
-To get the newest version of the scripts later:
+**With install options.** Through `pct exec`, put the [options](#options) after `env` and before `bash`. For example, to turn on the HTTP-to-HTTPS redirect:
+
+```bash
+pct exec 120 -- env HTTPS_REDIRECT=1 bash /root/savapage-easy-install/install-savapage.sh
+```
+
+In the container's own Console, leave out `pct exec 120 -- env`:
+
+```bash
+HTTPS_REDIRECT=1 bash /root/savapage-easy-install/install-savapage.sh
+```
+
+**To uninstall later** ([details](#keep-the-container-remove-only-savapage-the-uninstall-script)):
+
+```bash
+pct exec 120 -- env ASSUME_YES=1 bash /root/savapage-easy-install/uninstall-savapage.sh
+```
+
+**To get the newest version of the scripts later:**
 
 ```bash
 pct exec 120 -- git -C /root/savapage-easy-install pull
