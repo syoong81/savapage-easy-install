@@ -17,37 +17,28 @@ Installing it by hand takes many steps: Java, CUPS, a system account, CUPS harde
 
 The setup isn't tied to any particular network, so you can set it up at one location and move it to another.
 
-## Which guide do I follow?
+## How to install
 
-| You're installing on… | Guide |
-|---|---|
-| A physical PC/server, or a virtual machine (Proxmox VM, VirtualBox, Hyper-V…) | **[INSTALL-VM.md](INSTALL-VM.md)** |
-| A Proxmox LXC container | **[INSTALL-LXC.md](INSTALL-LXC.md)** |
+Everything is in **[INSTALL.md](INSTALL.md)**, one guide for both a **VM / physical machine** and a **Proxmox LXC container**.
 
-## Getting the files
-
-**Recommended: clone this repository straight onto the server.** It needs nothing from your PC, and `git pull` gets you updates later. The guides also explain three other ways: copying the files with PowerShell, copying them with WinSCP, or pasting the script over SSH.
-
-On a physical machine or VM, first install git:
+The short version, on a VM or physical machine:
 
 ```bash
 sudo apt-get update && sudo apt-get install -y git
 ```
 
-Then clone the repository and run the installer:
-
 ```bash
 git clone https://github.com/syoong81/savapage-easy-install.git ~/savapage-easy-install && sudo bash ~/savapage-easy-install/install-savapage.sh
 ```
 
-Install options go between `sudo` and `bash`, e.g. `sudo HTTPS_REDIRECT=1 bash …`. For all the options, see the [VM guide](INSTALL-VM.md#option-a-clone-from-github-recommended). For the Proxmox container commands, see the [LXC guide](INSTALL-LXC.md#option-a-clone-from-github-recommended).
+In a Proxmox LXC container's console you're root, so leave out `sudo`. Then open `http://SERVER-IP:8631/admin`, which redirects to HTTPS, log in as `admin` / `admin` and change the password.
 
 ## Supported systems
 
 | System | Status |
 |---|---|
-| Debian 13 (trixie), Proxmox LXC container | ✅ Tested: install, web apps, IPP printing, HTTPS redirect option, re-running the script, start after reboot, uninstall script and reinstall |
-| Ubuntu 26.04 LTS, Proxmox VM | ✅ Tested: install, ufw firewall, web apps, IPP printing, uninstall script (all options) and reinstall |
+| Debian 13 (trixie), Proxmox LXC container | ✅ Tested: install, web apps, IPP printing, HTTPS redirect (on by default and turned off), re-running the script, start after reboot, uninstall script and reinstall |
+| Ubuntu 26.04 LTS, Proxmox VM | ✅ Tested: install, ufw firewall, web apps, IPP printing, HTTPS redirect on by default, uninstall script (all options) and reinstall |
 | Debian 12 (bookworm) | Supported, not yet tested |
 
 The machine must be 64-bit Intel/AMD (x86_64). Raspberry Pi / ARM is not supported, because SavaPage only publishes x86_64 installers.
@@ -58,8 +49,7 @@ The machine must be 64-bit Intel/AMD (x86_64). Raspberry Pi / ARM is not support
 |---|---|
 | `install-savapage.sh` | The install script |
 | `uninstall-savapage.sh` | The uninstall script. It backs up your data, removes SavaPage and checks the machine is clean for a reinstall. |
-| `INSTALL-VM.md` | Step-by-step guide for a physical machine or a VM |
-| `INSTALL-LXC.md` | Step-by-step guide for a Proxmox LXC container |
+| `INSTALL.md` | Step-by-step install guide for a VM / physical machine and a Proxmox LXC container |
 | `LICENSE` | MIT License for these scripts and guides |
 
 ## License

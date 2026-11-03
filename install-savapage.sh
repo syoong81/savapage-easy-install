@@ -15,8 +15,8 @@
 #   SAVAPAGE_VERSION=1.7.0-final Installer version (default: 1.7.0-final)
 #   SKIP_FIREWALL=1              Do not configure ufw (you handle the firewall yourself)
 #   SKIP_FIREWALL=0              Force ufw setup even inside an LXC container
-#   HTTPS_REDIRECT=1             Redirect web pages on http://...:8631 to https://...:8632
-#                                (default: off; IPP printing is never redirected)
+#   HTTPS_REDIRECT=0             Don't redirect web pages on http://...:8631 to https://...:8632
+#                                (default: 1 = redirect on; IPP printing is never redirected)
 #
 set -euo pipefail
 
@@ -24,6 +24,7 @@ DOWNLOAD_BASE="https://download.savapage.org"
 INSTALL_DIR="/opt/savapage"
 SAVAPAGE_USER="savapage"
 SAVAPAGE_VERSION="${SAVAPAGE_VERSION:-1.7.0-final}"
+HTTPS_REDIRECT="${HTTPS_REDIRECT:-1}"
 
 # Ports SavaPage needs (see manual, "Check Firewall Settings").
 OPEN_TCP_PORTS="22 8631 8632 9100"   # SSH, HTTP, HTTPS, JetDirect/RAW printing
@@ -142,6 +143,7 @@ log "Configuring CUPS for local-only access"
 CUPSD_CONF=/etc/cups/cupsd.conf
 [[ -f "$CUPSD_CONF.savapage.bak" ]] || cp "$CUPSD_CONF" "$CUPSD_CONF.savapage.bak"
 
+systemctl reset-failed cups.service 2>/dev/null || true
 systemctl enable --now cups.service
 # Do not share or publish printers to the network, and keep the CUPS web/admin UI local.
 cupsctl --no-share-printers --no-remote-admin --no-remote-any
@@ -178,6 +180,7 @@ if [[ -f /etc/cups/cups-browsed.conf ]]; then
 fi
 
 cupsd -t >/dev/null || die "cupsd.conf failed validation. Original saved as $CUPSD_CONF.savapage.bak"
+systemctl reset-failed cups.service 2>/dev/null || true
 systemctl restart cups.service
 
 # ---------------------------------------------------------------------------
@@ -237,17 +240,26 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# 7. Optional: redirect http://...:8631 web pages to HTTPS (off by default)
+# 7. Redirect http://...:8631 web pages to HTTPS (on by default)
 # ---------------------------------------------------------------------------
 SERVER_PROPS="$INSTALL_DIR/server/data/server.properties"
-if [[ "${HTTPS_REDIRECT:-0}" == "1" ]]; then
-  log "Enabling the HTTP to HTTPS redirect for the web apps"
-  [[ -f "$SERVER_PROPS" ]] || die "$SERVER_PROPS not found."
-  if grep -qE '^[[:space:]]*server\.html\.redirect\.ssl[[:space:]]*=' "$SERVER_PROPS"; then
-    sed -i -E 's/^[[:space:]]*server\.html\.redirect\.ssl[[:space:]]*=.*/server.html.redirect.ssl=true/' "$SERVER_PROPS"
-  else
-    echo 'server.html.redirect.ssl=true' >> "$SERVER_PROPS"
-  fi
+[[ -f "$SERVER_PROPS" ]] || die "$SERVER_PROPS not found."
+if [[ "$HTTPS_REDIRECT" == "1" ]]; then
+  redirect_value=true
+  log "Turning on the HTTP to HTTPS redirect for the web apps"
+else
+  redirect_value=false
+  log "Turning off the HTTP to HTTPS redirect (HTTPS_REDIRECT=0)"
+fi
+if grep -qE '^[[:space:]]*server\.html\.redirect\.ssl[[:space:]]*=' "$SERVER_PROPS"; then
+  current=$(grep -E '^[[:space:]]*server\.html\.redirect\.ssl[[:space:]]*=' "$SERVER_PROPS" | tail -n 1 | cut -d= -f2 | tr -d '[:space:]')
+  sed -i -E "s/^[[:space:]]*server\.html\.redirect\.ssl[[:space:]]*=.*/server.html.redirect.ssl=$redirect_value/" "$SERVER_PROPS"
+else
+  current=false
+  echo "server.html.redirect.ssl=$redirect_value" >> "$SERVER_PROPS"
+fi
+# Restart only when the setting actually changed.
+if [[ "$current" != "$redirect_value" ]]; then
   systemctl restart savapage.service
 fi
 
@@ -256,7 +268,7 @@ fi
 # ---------------------------------------------------------------------------
 if [[ "${SKIP_FIREWALL:-0}" == "1" ]]; then
   if (( IN_LXC )); then
-    warn "Firewall skipped (LXC). In Proxmox, allow TCP $OPEN_TCP_PORTS and UDP $OPEN_UDP_PORTS for this container (see INSTALL-LXC.md)."
+    warn "Firewall skipped (LXC). In Proxmox, allow TCP $OPEN_TCP_PORTS and UDP $OPEN_UDP_PORTS for this container (see INSTALL.md)."
   else
     warn "SKIP_FIREWALL=1: not touching the firewall. Open TCP $OPEN_TCP_PORTS and UDP $OPEN_UDP_PORTS yourself."
   fi
@@ -313,12 +325,14 @@ cat <<EOF
  User web app  : https://$HOST_IP:8632/user
  AirPrint/IPP  : ipps://$HOST_IP:8632/printers/airprint
 
+ HTTP redirect : $( [[ "$redirect_value" == true ]] && echo "on (http://$HOST_IP:8631 goes to HTTPS)" || echo "off" )
+
  Your browser will warn about the self-signed certificate. That is
  expected; accept it to continue.
 
  The IP address above is today's. After moving the server, use the
  new IP or $HOSTNAME_LOCAL instead.
 
- Next steps    : see INSTALL-VM.md or INSTALL-LXC.md.
+ Next steps    : see INSTALL.md.
 ========================================================================
 EOF
