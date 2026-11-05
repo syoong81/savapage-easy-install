@@ -37,7 +37,7 @@ In a Proxmox LXC container's console you're root, so leave out `sudo`. Then open
 
 | System | Status |
 |---|---|
-| Debian 13 (trixie), Proxmox LXC container | ✅ Tested: install, web apps, IPP printing, HTTPS redirect (on by default and turned off), re-running the script, start after reboot, uninstall script and reinstall |
+| Debian 13 (trixie), Proxmox LXC container | ✅ Tested: install, ufw firewall, web apps, IPP printing, HTTPS redirect (on by default and turned off), re-running the script, start after reboot, uninstall script and reinstall |
 | Ubuntu 26.04 LTS, Proxmox VM | ✅ Tested: install, ufw firewall, web apps, IPP printing, HTTPS redirect on by default, uninstall script (all options) and reinstall |
 | Debian 12 (bookworm) | Supported, not yet tested |
 

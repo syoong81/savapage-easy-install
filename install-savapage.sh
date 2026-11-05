@@ -14,7 +14,6 @@
 # Optional settings (environment variables):
 #   SAVAPAGE_VERSION=1.7.0-final Installer version (default: 1.7.0-final)
 #   SKIP_FIREWALL=1              Do not configure ufw (you handle the firewall yourself)
-#   SKIP_FIREWALL=0              Force ufw setup even inside an LXC container
 #   HTTPS_REDIRECT=0             Don't redirect web pages on http://...:8631 to https://...:8632
 #                                (default: 1 = redirect on; IPP printing is never redirected)
 #
@@ -68,15 +67,11 @@ fi
 mem_kb=$(awk '/MemTotal/ {print $2}' /proc/meminfo)
 (( mem_kb >= 1900000 )) || warn "SavaPage recommends at least 2 GB RAM (found $((mem_kb / 1024)) MB)."
 
-# LXC containers (e.g. Proxmox CT) cannot reliably run ufw, and Avahi needs a tweak.
+# LXC containers (e.g. Proxmox CT) need an Avahi tweak, and ufw may not start in some.
 IN_LXC=0
 if [[ "$(systemd-detect-virt -c 2>/dev/null || true)" == lxc* ]]; then
   IN_LXC=1
   log "Running inside an LXC container"
-  if [[ -z "${SKIP_FIREWALL:-}" ]]; then
-    SKIP_FIREWALL=1
-    echo "ufw will be skipped. Use the Proxmox firewall for this container instead."
-  fi
   if systemctl list-units --state=failed --no-legend 2>/dev/null | grep -q .; then
     warn "Some systemd units have failed. On Proxmox, make sure the container has 'nesting=1' (Options > Features)."
   fi
@@ -143,7 +138,7 @@ log "Configuring CUPS for local-only access"
 CUPSD_CONF=/etc/cups/cupsd.conf
 [[ -f "$CUPSD_CONF.savapage.bak" ]] || cp "$CUPSD_CONF" "$CUPSD_CONF.savapage.bak"
 
-systemctl reset-failed cups.service 2>/dev/null || true
+systemctl reset-failed cups.service cups.socket cups.path 2>/dev/null || true
 systemctl enable --now cups.service
 # Do not share or publish printers to the network, and keep the CUPS web/admin UI local.
 cupsctl --no-share-printers --no-remote-admin --no-remote-any
@@ -180,8 +175,9 @@ if [[ -f /etc/cups/cups-browsed.conf ]]; then
 fi
 
 cupsd -t >/dev/null || die "cupsd.conf failed validation. Original saved as $CUPSD_CONF.savapage.bak"
-systemctl reset-failed cups.service 2>/dev/null || true
+systemctl reset-failed cups.service cups.socket cups.path 2>/dev/null || true
 systemctl restart cups.service
+systemctl start cups.socket cups.path 2>/dev/null || true
 
 # ---------------------------------------------------------------------------
 # 4. Avahi (IPP Everywhere / AirPrint discovery on the local network)
@@ -266,12 +262,24 @@ fi
 # ---------------------------------------------------------------------------
 # 8. Firewall: open the SavaPage ports (from any network)
 # ---------------------------------------------------------------------------
+configure_ufw() {
+  ufw default deny incoming >/dev/null || return 1
+  ufw default allow outgoing >/dev/null || return 1
+  local p label
+  for p in $OPEN_TCP_PORTS; do
+    if [[ "$p" == 22 ]]; then label='SSH'; else label='SavaPage'; fi
+    ufw allow "$p/tcp" comment "$label" >/dev/null || return 1
+  done
+  for p in $OPEN_UDP_PORTS; do
+    ufw allow "$p/udp" comment 'mDNS' >/dev/null || return 1
+  done
+  # CUPS (631) and SavaPage's local SSL port (8633) are deliberately not opened.
+  ufw --force enable >/dev/null || return 1
+  ufw status | grep -q '^Status: active'
+}
+
 if [[ "${SKIP_FIREWALL:-0}" == "1" ]]; then
-  if (( IN_LXC )); then
-    warn "Firewall skipped (LXC). In Proxmox, allow TCP $OPEN_TCP_PORTS and UDP $OPEN_UDP_PORTS for this container (see INSTALL.md)."
-  else
-    warn "SKIP_FIREWALL=1: not touching the firewall. Open TCP $OPEN_TCP_PORTS and UDP $OPEN_UDP_PORTS yourself."
-  fi
+  warn "SKIP_FIREWALL=1: not touching the firewall. Open TCP $OPEN_TCP_PORTS and UDP $OPEN_UDP_PORTS yourself."
 else
   log "Configuring the firewall (ufw): opening the SavaPage ports"
   if systemctl is-active --quiet firewalld 2>/dev/null; then
@@ -279,20 +287,16 @@ else
   fi
   apt-get install -y -q ufw
 
-  ufw default deny incoming >/dev/null
-  ufw default allow outgoing >/dev/null
-
-  for p in $OPEN_TCP_PORTS; do
-    if [[ "$p" == 22 ]]; then label='SSH'; else label='SavaPage'; fi
-    ufw allow "$p/tcp" comment "$label" >/dev/null
-  done
-  for p in $OPEN_UDP_PORTS; do
-    ufw allow "$p/udp" comment 'mDNS' >/dev/null
-  done
-  # CUPS (631) and SavaPage's local SSL port (8633) are deliberately not opened.
-
-  ufw --force enable >/dev/null
-  ufw status verbose
+  if configure_ufw; then
+    ufw status verbose
+  elif (( IN_LXC )); then
+    # Some container setups can't run a firewall. Carry on without one.
+    ufw --force disable >/dev/null 2>&1 || true
+    warn "ufw could not start in this container, so the firewall is off. Use the Proxmox firewall"
+    warn "for this container instead: allow TCP $OPEN_TCP_PORTS and UDP $OPEN_UDP_PORTS (see INSTALL.md)."
+  else
+    die "Could not set up the ufw firewall. Rerun with SKIP_FIREWALL=1 to skip it."
+  fi
 fi
 
 # ---------------------------------------------------------------------------

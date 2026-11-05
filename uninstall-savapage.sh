@@ -111,7 +111,7 @@ if (( ! NOTHING_INSTALLED )); then
     groupdel "$SAVAPAGE_USER"
   fi
 
-  systemctl reset-failed cups.service 2>/dev/null || true
+  systemctl reset-failed cups.service cups.socket cups.path 2>/dev/null || true
   systemctl restart cups.service 2>/dev/null || true
 fi
 
@@ -122,7 +122,7 @@ if [[ "${RESTORE_CUPS:-0}" == "1" ]]; then
   if [[ -f "$CUPSD_CONF.savapage.bak" ]]; then
     log "Restoring the original CUPS configuration"
     cp "$CUPSD_CONF.savapage.bak" "$CUPSD_CONF"
-    systemctl reset-failed cups.service 2>/dev/null || true
+    systemctl reset-failed cups.service cups.socket cups.path 2>/dev/null || true
     systemctl restart cups.service
   else
     warn "No $CUPSD_CONF.savapage.bak found. CUPS configuration left as is."

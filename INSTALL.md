@@ -159,9 +159,7 @@ bash ~/savapage-easy-install/install-savapage.sh
 
 - It takes **about 5–10 minutes**. The SavaPage download is about 150 MB. **Don't close the window.**
 - When it's done, you'll see a box saying **"SavaPage 1.7.0-final is installed"** with the web addresses.
-- A yellow `[!]` line is a warning; the install continues.
-  - In a container, *"Firewall skipped (LXC)"* is expected.
-  - With under 2 GB RAM, you'll get a memory warning.
+- A yellow `[!]` line is a warning; the install continues. For example, with under 2 GB RAM you'll get a memory warning.
 - A red `[x]` line means the script stopped. See [Troubleshooting](#troubleshooting).
 
 To change how it installs, see [Install options](#install-options). For example, `HTTPS_REDIRECT=0` keeps the HTTPS redirect off.
@@ -206,7 +204,7 @@ Copy everything it prints into your password manager, or another safe place **of
 
 ## 6. Firewall
 
-**VM / physical machine:** nothing to do. The script turns on the `ufw` firewall and blocks all incoming traffic except these ports:
+Nothing to do, on a VM, a physical machine or an LXC container. The script turns on the `ufw` firewall and blocks all incoming traffic except these ports:
 
 | Port | Purpose |
 |---|---|
@@ -216,9 +214,23 @@ Copy everything it prints into your password manager, or another safe place **of
 | TCP 9100 | RAW printing |
 | UDP 5353 | Printer discovery (AirPrint) |
 
-> ⚠️ **Other services on the machine get blocked too** (file sharing, websites…). Allow each one, e.g. `sudo ufw allow 445/tcp`, or install with `SKIP_FIREWALL=1`.
+CUPS (631) stays blocked. Check the firewall at any time.
 
-**LXC container (optional):** the script can't use a firewall inside a container. To limit access, use Proxmox's:
+**VM / physical machine:**
+
+```bash
+sudo ufw status verbose
+```
+
+**LXC container:**
+
+```bash
+ufw status verbose
+```
+
+> ⚠️ **Other services on the machine get blocked too** (file sharing, websites…). Allow each one, e.g. `ufw allow 445/tcp` (with `sudo` on a VM), or install with `SKIP_FIREWALL=1`.
+
+**If the container can't run a firewall.** This can happen with some container setups. The script then finishes anyway and warns *"ufw could not start in this container"*. In that case, use Proxmox's firewall instead:
 
 1. Select the container → **Firewall → Add**.
 2. Add one rule for each port in the table above. Each rule is **Direction** `in`, **Action** `ACCEPT`, **Protocol** `tcp` or `udp`, **Dest. port**.
@@ -329,8 +341,7 @@ HTTPS_REDIRECT=0 bash ~/savapage-easy-install/install-savapage.sh
 | Option | Default | Effect |
 |---|---|---|
 | `HTTPS_REDIRECT=0` | on | Don't send browsers on `http://…:8631` to HTTPS. See [HTTPS redirect](#https-redirect). |
-| `SKIP_FIREWALL=1` | off (VM) | Don't touch the firewall. Use it if you manage the firewall yourself. |
-| `SKIP_FIREWALL=0` | skipped (LXC) | Try to set up `ufw` inside a container anyway. |
+| `SKIP_FIREWALL=1` | off | Don't touch the firewall. Use it if you manage the firewall yourself. |
 | `SAVAPAGE_VERSION=…` | `1.7.0-final` | Install a different SavaPage release. |
 
 ## HTTPS redirect
@@ -423,7 +434,7 @@ This updates the scripts, not SavaPage itself. To upgrade SavaPage, see the [upg
 6. **Downloads** [SavaPage 1.7.0](https://download.savapage.org/installer/savapage-setup-1.7.0-final-linux-x64.bin) and **verifies its SHA-512 checksum**.
 7. **Runs the SavaPage installer**, then its root step (`MUST-RUN-AS-ROOT`), which installs the `savapage` service.
 8. **Turns on the HTTPS redirect**, unless `HTTPS_REDIRECT=0`.
-9. **Turns on the `ufw` firewall** on VMs and physical machines ([ports](#6-firewall)). It skips this in containers.
+9. **Turns on the `ufw` firewall** ([ports](#6-firewall)), in containers too. If a container can't run it, the script warns and carries on.
 
 You can safely run it again. It skips what's already done.
 
@@ -446,7 +457,7 @@ On a VM, put `sudo` in front of each command.
 |---|---|
 | Is SavaPage running? | `systemctl status savapage` |
 | Restart SavaPage | `systemctl restart savapage` |
-| Firewall rules (VM) | `ufw status verbose` |
+| Firewall rules | `ufw status verbose` |
 | Install OS updates | `apt update && apt upgrade` |
 | Edit SavaPage's settings | `nano /opt/savapage/server/data/server.properties` |
 | Log files | `ls /opt/savapage/server/logs/` |
@@ -471,12 +482,13 @@ On a VM, put `sudo` in front of each command.
 | `Could not reach download.savapage.org` | No internet access. Check the network and try again. |
 | `Checksum mismatch` | The download was damaged or tampered with. Run the script again. If it keeps happening, stop and investigate. |
 | `firewalld is active` | Re-run with `SKIP_FIREWALL=1` and open the ports in firewalld yourself. |
+| `ufw could not start in this container` (yellow) | This container setup can't run a firewall. SavaPage still works. Use the Proxmox firewall instead, see [Firewall](#6-firewall). |
 | LXC: *"Some systemd units have failed"*, or services won't start | Turn on **Options → Features → Nesting**, restart the container and run the script again. |
 | LXC: `avahi-daemon` won't start | Run `nano /etc/avahi/avahi-daemon.conf`, put `#` in front of the `rlimit-nproc=` line, save, then run `systemctl restart avahi-daemon`. The script normally does this. |
 | LXC console won't paste | Switch to the **xterm.js** console. Click the arrow next to **Console** at the top. |
 | "Invalid response" in the browser | You used `http://` with port 8632. Use `http://…:8631` or `https://…:8632`. |
 | Browser says "not private" | Normal for a self-signed certificate. Click *Advanced → Continue*. |
-| Web page doesn't load | Check the IP (`hostname -I`) and that SavaPage is running (`systemctl status savapage`). On a VM, check `ufw status`. Logs are in `/opt/savapage/server/logs/`. |
+| Web page doesn't load | Check the IP (`hostname -I`) and that SavaPage is running (`systemctl status savapage`). Check `ufw status`. Logs are in `/opt/savapage/server/logs/`. |
 | Printers don't show in SavaPage | Check CUPS sees them with `lpstat -p`. Make sure each one is shared: `lpadmin -p NAME -o printer-is-shared=true`. |
 | Forgot the admin password | See the [SavaPage manual](https://manual.savapage.org/). |
 
