@@ -16,6 +16,8 @@
 #   SKIP_FIREWALL=1              Do not configure ufw (you handle the firewall yourself)
 #   HTTPS_REDIRECT=0             Don't redirect web pages on http://...:8631 to https://...:8632
 #                                (default: 1 = redirect on; IPP printing is never redirected)
+#   CUPS_WEB=1                   Open the CUPS web interface (port 631) to the local network
+#                                (default: 0 = CUPS only reachable from the server itself)
 #
 set -euo pipefail
 
@@ -24,6 +26,7 @@ INSTALL_DIR="/opt/savapage"
 SAVAPAGE_USER="savapage"
 SAVAPAGE_VERSION="${SAVAPAGE_VERSION:-1.7.0-final}"
 HTTPS_REDIRECT="${HTTPS_REDIRECT:-1}"
+CUPS_WEB="${CUPS_WEB:-0}"
 
 # Ports SavaPage needs (see manual, "Check Firewall Settings").
 OPEN_TCP_PORTS="22 8631 8632 9100"   # SSH, HTTP, HTTPS, JetDirect/RAW printing
@@ -179,6 +182,22 @@ systemctl reset-failed cups.service cups.socket cups.path 2>/dev/null || true
 systemctl restart cups.service
 systemctl start cups.socket cups.path 2>/dev/null || true
 
+# Optional: CUPS web interface on the local network (off by default). CUPS itself
+# limits it to the local subnet (Allow @LOCAL), and admin pages still need a login.
+if [[ "$CUPS_WEB" == "1" ]]; then
+  log "Opening the CUPS web interface to the local network (CUPS_WEB=1)"
+  cupsctl --remote-admin
+  # cupsctl makes cupsd restart; wait until it answers again.
+  for _ in $(seq 1 15); do
+    (exec 3<>/dev/tcp/127.0.0.1/631) 2>/dev/null && break
+    sleep 1
+  done
+  if [[ -n "${SUDO_USER:-}" && "$SUDO_USER" != root ]]; then
+    usermod -aG lpadmin "$SUDO_USER"
+    echo "Added '$SUDO_USER' to the lpadmin group, so it can log in to the CUPS admin pages."
+  fi
+fi
+
 # ---------------------------------------------------------------------------
 # 4. Avahi (IPP Everywhere / AirPrint discovery on the local network)
 # ---------------------------------------------------------------------------
@@ -262,18 +281,30 @@ fi
 # ---------------------------------------------------------------------------
 # 8. Firewall: open the SavaPage ports (from any network)
 # ---------------------------------------------------------------------------
+if [[ "$CUPS_WEB" == "1" ]]; then
+  OPEN_TCP_PORTS="$OPEN_TCP_PORTS 631"
+fi
+
 configure_ufw() {
   ufw default deny incoming >/dev/null || return 1
   ufw default allow outgoing >/dev/null || return 1
   local p label
   for p in $OPEN_TCP_PORTS; do
-    if [[ "$p" == 22 ]]; then label='SSH'; else label='SavaPage'; fi
+    case "$p" in
+      22)  label='SSH' ;;
+      631) label='CUPS web interface' ;;
+      *)   label='SavaPage' ;;
+    esac
     ufw allow "$p/tcp" comment "$label" >/dev/null || return 1
   done
   for p in $OPEN_UDP_PORTS; do
     ufw allow "$p/udp" comment 'mDNS' >/dev/null || return 1
   done
-  # CUPS (631) and SavaPage's local SSL port (8633) are deliberately not opened.
+  # CUPS (631) stays closed unless CUPS_WEB=1. Close it again if it was opened before.
+  # SavaPage's local SSL port (8633) is never opened.
+  if [[ "$CUPS_WEB" != "1" ]]; then
+    ufw delete allow 631/tcp >/dev/null 2>&1 || true
+  fi
   ufw --force enable >/dev/null || return 1
   ufw status | grep -q '^Status: active'
 }
@@ -330,6 +361,7 @@ cat <<EOF
  AirPrint/IPP  : ipps://$HOST_IP:8632/printers/airprint
 
  HTTP redirect : $( [[ "$redirect_value" == true ]] && echo "on (http://$HOST_IP:8631 goes to HTTPS)" || echo "off" )
+ CUPS web page : $( [[ "$CUPS_WEB" == 1 ]] && echo "on (http://$HOST_IP:631, local network only)" || echo "off (local only; CUPS_WEB=1 opens it)" )
 
  Your browser will warn about the self-signed certificate. That is
  expected; accept it to continue.

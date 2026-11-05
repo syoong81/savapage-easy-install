@@ -10,7 +10,7 @@
 #   ASSUME_YES=1             Don't ask for confirmation (needed with 'pct exec')
 #   SKIP_BACKUP=1            Don't back up /opt/savapage/server/data first
 #   RESTORE_CUPS=1           Restore /etc/cups/cupsd.conf from the installer's backup
-#   REMOVE_FIREWALL_RULES=1  Remove the ufw rules for ports 8631, 8632, 9100 and 5353
+#   REMOVE_FIREWALL_RULES=1  Remove the ufw rules for ports 8631, 8632, 9100, 5353 (and 631 if opened)
 #                            (the SSH rule and ufw itself are left alone)
 #
 # Example:
@@ -134,6 +134,7 @@ if [[ "${REMOVE_FIREWALL_RULES:-0}" == "1" ]]; then
     log "Removing SavaPage's ufw rules (SSH rule kept)"
     for p in $SAVAPAGE_PORTS; do ufw delete allow "$p/tcp" >/dev/null 2>&1 || true; done
     ufw delete allow 5353/udp >/dev/null 2>&1 || true
+    ufw delete allow 631/tcp >/dev/null 2>&1 || true   # CUPS web interface (CUPS_WEB=1)
   else
     warn "ufw is not installed. No firewall rules to remove."
   fi

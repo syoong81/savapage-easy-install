@@ -27,7 +27,7 @@ Type or paste each command and press **Enter**. When you type a password, **noth
 7. [Set up SavaPage](#7-set-up-savapage)
 8. [Print to SavaPage from devices](#8-print-to-savapage-from-devices)
 
-Reference: [Install options](#install-options) · [HTTPS redirect](#https-redirect) · [Updating the scripts](#updating-the-scripts) · [What the script changes](#what-the-script-changes) · [Moving the server](#moving-the-server-to-another-location) · [Everyday commands](#everyday-commands) · [Security](#security) · [Troubleshooting](#troubleshooting) · [Uninstall](#uninstall)
+Reference: [Install options](#install-options) · [CUPS web page](#cups-web-page) · [HTTPS redirect](#https-redirect) · [Updating the scripts](#updating-the-scripts) · [What the script changes](#what-the-script-changes) · [Moving the server](#moving-the-server-to-another-location) · [Everyday commands](#everyday-commands) · [Security](#security) · [Troubleshooting](#troubleshooting) · [Uninstall](#uninstall)
 
 ---
 
@@ -214,7 +214,7 @@ Nothing to do, on a VM, a physical machine or an LXC container. The script turns
 | TCP 9100 | RAW printing |
 | UDP 5353 | Printer discovery (AirPrint) |
 
-CUPS (631) stays blocked. Check the firewall at any time.
+CUPS (631) stays blocked, unless you turn on the [CUPS web page](#cups-web-page). Check the firewall at any time.
 
 **VM / physical machine:**
 
@@ -279,6 +279,8 @@ In the admin web app:
 
    In SavaPage, open **Printers**. The new printer appears there. Enable it.
 
+   *Prefer clicking to typing?* Turn on the [CUPS web page](#cups-web-page) and add printers there instead.
+
 5. *(Optional)* **Options → Mail** to send email notifications.
 
 ---
@@ -341,8 +343,57 @@ HTTPS_REDIRECT=0 bash ~/savapage-easy-install/install-savapage.sh
 | Option | Default | Effect |
 |---|---|---|
 | `HTTPS_REDIRECT=0` | on | Don't send browsers on `http://…:8631` to HTTPS. See [HTTPS redirect](#https-redirect). |
+| `CUPS_WEB=1` | off | Open the CUPS web page (port 631) to your local network. See [CUPS web page](#cups-web-page). |
 | `SKIP_FIREWALL=1` | off | Don't touch the firewall. Use it if you manage the firewall yourself. |
 | `SAVAPAGE_VERSION=…` | `1.7.0-final` | Install a different SavaPage release. |
+
+## CUPS web page
+
+CUPS, the print system SavaPage prints through, has its own web page at `http://SERVER-IP:631`. It's handy for adding and checking printers.
+
+It's **off by default**: CUPS only accepts connections from the server itself, and port 631 is blocked. That follows SavaPage's recommendation, and it's why `SERVER-IP:631` shows nothing from another computer.
+
+**Turn it on.** Re-run the installer with `CUPS_WEB=1`. It skips the parts already done.
+
+**VM / physical machine:**
+
+```bash
+sudo CUPS_WEB=1 bash ~/savapage-easy-install/install-savapage.sh
+```
+
+**LXC container:**
+
+```bash
+CUPS_WEB=1 bash ~/savapage-easy-install/install-savapage.sh
+```
+
+This opens port 631 in the firewall, and tells CUPS to accept connections from your **local network only** (other networks are still refused).
+
+**Use it:**
+
+1. Browse to `http://SERVER-IP:631` to see printers and jobs.
+2. To make changes, use the secure address **`https://SERVER-IP:631/admin`**. (On plain `http://`, the admin pages say *"Upgrade Required"*.) Accept the certificate warning, as with SavaPage.
+3. Log in:
+   - **VM / physical machine:** your own Linux user and password. When you run the installer with `sudo`, it adds you to the `lpadmin` group, which is allowed to manage printers.
+   - **LXC container:** `root` and the container's root password.
+
+**Turn it off.** Re-run the installer **without** `CUPS_WEB=1`.
+
+**VM / physical machine:**
+
+```bash
+sudo bash ~/savapage-easy-install/install-savapage.sh
+```
+
+**LXC container:**
+
+```bash
+bash ~/savapage-easy-install/install-savapage.sh
+```
+
+That closes port 631 and returns CUPS to local-only.
+
+> Every time you run the installer, it sets this to match the option. Without `CUPS_WEB=1`, it closes the page again. To keep it open, include `CUPS_WEB=1` every time (together with any other options, e.g. `CUPS_WEB=1 HTTPS_REDIRECT=0`).
 
 ## HTTPS redirect
 
@@ -426,7 +477,7 @@ This updates the scripts, not SavaPage itself. To upgrade SavaPage, see the [upg
 2. **Installs packages:** Java 21 (Java 17 on Debian 12), CUPS, Poppler, QPDF, ImageMagick, librsvg, Avahi and a few small helper tools.
 3. **Creates** the `savapage` service account (home `/opt/savapage`).
 4. **Sets up CUPS**, the print system SavaPage prints through:
-   - It only accepts connections from the server itself.
+   - It only accepts connections from the server itself, unless `CUPS_WEB=1`.
    - Printer sharing and remote admin are off, and it won't import remote printers.
    - It applies SavaPage's recommended job-history settings.
    - The original config is saved as `/etc/cups/cupsd.conf.savapage.bak`.
@@ -489,6 +540,7 @@ On a VM, put `sudo` in front of each command.
 | "Invalid response" in the browser | You used `http://` with port 8632. Use `http://…:8631` or `https://…:8632`. |
 | Browser says "not private" | Normal for a self-signed certificate. Click *Advanced → Continue*. |
 | Web page doesn't load | Check the IP (`hostname -I`) and that SavaPage is running (`systemctl status savapage`). Check `ufw status`. Logs are in `/opt/savapage/server/logs/`. |
+| Nothing at `SERVER-IP:631` (CUPS page) | That's the default: CUPS only listens on the server itself. Turn it on with `CUPS_WEB=1`. See [CUPS web page](#cups-web-page). |
 | Printers don't show in SavaPage | Check CUPS sees them with `lpstat -p`. Make sure each one is shared: `lpadmin -p NAME -o printer-is-shared=true`. |
 | Forgot the admin password | See the [SavaPage manual](https://manual.savapage.org/). |
 
@@ -528,6 +580,6 @@ When everything says PASS, you can [reinstall](#3-run-the-installer) at any time
 | `ASSUME_YES=1` | Don't ask for confirmation. |
 | `SKIP_BACKUP=1` | Don't make the backup. |
 | `RESTORE_CUPS=1` | Put back the CUPS config from before SavaPage. |
-| `REMOVE_FIREWALL_RULES=1` | Remove the firewall rules for 8631, 8632, 9100 and 5353. The SSH rule and the firewall stay. |
+| `REMOVE_FIREWALL_RULES=1` | Remove the firewall rules for 8631, 8632, 9100, 5353 and 631 (if opened). The SSH rule and the firewall stay. |
 
 **LXC container, the quick way:** delete the whole container (**More → Remove**). Back up `encryption.properties` first.
