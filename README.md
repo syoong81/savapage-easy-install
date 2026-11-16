@@ -21,7 +21,15 @@ The setup isn't tied to any particular network, so you can set it up at one loca
 
 Everything is in **[INSTALL.md](INSTALL.md)**, one guide for both a **VM / physical machine** and a **Proxmox LXC container**.
 
-The short version, on a VM or physical machine:
+**Quickest, on Proxmox:** this creates a new VM with SavaPage installed. Run it in the **Proxmox host shell**:
+
+```bash
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/syoong81/savapage-easy-install/main/proxmox-vm.sh)"
+```
+
+See [INSTALL.md](INSTALL.md#quickest-a-new-proxmox-vm-with-one-command) for its settings.
+
+**By hand,** on an existing VM or physical machine:
 
 ```bash
 sudo apt-get update && sudo apt-get install -y git
@@ -39,6 +47,7 @@ In a Proxmox LXC container's console you're root, so leave out `sudo`. Then open
 |---|---|
 | Debian 13 (trixie), Proxmox LXC container | ✅ Tested: install, ufw firewall, web apps, IPP printing, HTTPS redirect (on by default and turned off), re-running the script, start after reboot, uninstall script and reinstall |
 | Ubuntu 26.04 LTS, Proxmox VM | ✅ Tested: install, ufw firewall, web apps, IPP printing, HTTPS redirect on by default, uninstall script (all options) and reinstall |
+| Debian 13, new VM from `proxmox-vm.sh` on Proxmox VE 9.2 | ✅ Tested: one-command VM creation, install, ufw firewall, web apps, IPP printing, CUPS web page (`CUPS_WEB=1`) |
 | Debian 12 (bookworm) | Supported, not yet tested |
 
 The machine must be 64-bit Intel/AMD (x86_64). Raspberry Pi / ARM is not supported, because SavaPage only publishes x86_64 installers.
@@ -48,13 +57,18 @@ The machine must be 64-bit Intel/AMD (x86_64). Raspberry Pi / ARM is not support
 | File | What it is |
 |---|---|
 | `install-savapage.sh` | The install script |
+| `proxmox-vm.sh` | Run on a Proxmox host: creates a new VM with SavaPage installed, in one command |
 | `uninstall-savapage.sh` | The uninstall script. It backs up your data, removes SavaPage and checks the machine is clean for a reinstall. |
 | `INSTALL.md` | Step-by-step install guide for a VM / physical machine and a Proxmox LXC container |
 | `LICENSE` | MIT License for these scripts and guides |
 
 ## License
 
-The scripts and guides in this repository are released under the [MIT License](LICENSE). That license covers **only this repository**. SavaPage itself, which the script downloads, is licensed separately under the [GNU AGPL v3](https://www.gnu.org/licenses/agpl-3.0.html).
+The scripts and guides in this repository are released under the [MIT License](LICENSE). That license covers **only this repository**.
+
+- **SavaPage software:** © Datraverse B.V., licensed under the [GNU AGPL v3 or later](https://www.gnu.org/licenses/agpl-3.0.html). This repository does **not** include or modify any SavaPage code. The install script downloads the unmodified official installer from `download.savapage.org` and checks its checksum. If you modify SavaPage itself and let others use it over a network, the AGPL requires you to offer them your modified source code.
+- **SavaPage User Manual:** © Rijk Ravestein, licensed under [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/). The guides here are written independently. They follow the setup steps and settings that the [SavaPage manual](https://manual.savapage.org/) describes, and copy none of its text.
+- **Other software the scripts install:** Java, CUPS, Debian/Ubuntu packages and cloud images all come straight from their official sources, under their own licenses. This repository doesn't redistribute any of them.
 
 ---
 

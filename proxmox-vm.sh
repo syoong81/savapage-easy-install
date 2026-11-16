@@ -2,7 +2,7 @@
 #
 # proxmox-vm.sh - Create a new Proxmox VM with SavaPage installed, in one command.
 #
-# Status: new, not yet confirmed on a real Proxmox host. Take a backup first.
+# Tested on Proxmox VE 9.2 with the default Debian 13 cloud image.
 #
 # Run this on the Proxmox HOST (Node > Shell in the web UI), as root:
 #   bash -c "$(curl -fsSL https://raw.githubusercontent.com/syoong81/savapage-easy-install/main/proxmox-vm.sh)"

@@ -1,11 +1,65 @@
 # Install guide
 
+## Quickest: a new Proxmox VM with one command
+
+If you use Proxmox, this one command creates a new VM with SavaPage already installed. Run it in the **Proxmox host shell**: click your **node** in the web UI, then **Shell**.
+
+```bash
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/syoong81/savapage-easy-install/main/proxmox-vm.sh)"
+```
+
+It:
+
+1. **Downloads the official Debian 13 cloud image** and checks its SHA-512 checksum.
+2. **Creates the VM:** next free ID, 2 cores, 2 GB RAM, 16 GB disk, DHCP on `vmbr0`, starts with the host.
+3. **Installs SavaPage on the VM's first boot** with this repo's installer.
+4. **Prints the VM's IP, the admin address and the VM login** when it's done, after about 3–15 minutes.
+
+**Save the VM password** it shows. It's random and shown twice: before the wait and at the end. If you lose it, run `qm guest passwd VMID admin` in the host shell to set a new one.
+
+Then continue at [step 4: Log in and change the password](#4-log-in-and-change-the-password). Inside the VM, the scripts are in `~/savapage-easy-install/`, for re-runs and uninstalling.
+
+**Settings.** Put them in front of `bash`, e.g.:
+
+```bash
+var_ram=4096 CUPS_WEB=1 bash -c "$(curl -fsSL https://raw.githubusercontent.com/syoong81/savapage-easy-install/main/proxmox-vm.sh)"
+```
+
+| Setting | Default | What it changes |
+|---|---|---|
+| `var_os` | `debian` | `debian` or `ubuntu` |
+| `var_version` | `13` | Debian `13` or `12`; Ubuntu `26.04` |
+| `var_vmid` | next free ID | VM ID |
+| `var_hostname` | `savapage` | VM name and hostname |
+| `var_cpu` / `var_ram` / `var_disk` | `2` / `2048` / `16` | Cores, RAM in MB, disk in GB |
+| `var_storage` | `local-lvm`, or the first that fits | Storage for the VM disk |
+| `var_bridge` | `vmbr0` | Network bridge |
+| `var_user` | `admin` | The VM login user (not `savapage`) |
+| `var_password` | random | The VM login password |
+| `var_sshkey` | none | A public key file to allow for SSH |
+| `HTTPS_REDIRECT`, `CUPS_WEB`, `SKIP_FIREWALL` | | Passed on to the installer. See [Install options](#install-options). |
+
+**Good to know:**
+
+- The VM uses Proxmox's **serial console**, so **Console** in the web UI supports copy and paste.
+- SSH logins with the VM password are allowed: `ssh admin@VM-IP`.
+- The VM's first-boot settings are saved as a Proxmox *snippet*, e.g. `/var/lib/vz/snippets/savapage-122.yaml`. Proxmox needs that file to start the VM, so keep it. It contains no passwords. If no storage allows snippets, the script turns them on for `local`.
+- To remove the VM later: **VM → More → Remove**. Then delete its snippet file.
+
+The rest of this guide is for installing **by hand**, on any VM, physical machine or LXC container.
+
+---
+
+## Install by hand
+
 One guide for both ways to run SavaPage:
 
 - **VM or physical machine:** a Proxmox VM, VirtualBox, Hyper-V, or an old PC/server.
 - **Proxmox LXC container:** lighter than a VM. Use it when your printers are on the network. A printer that plugs in by **USB** is easier with a VM.
 
 > Read the [Disclaimer](README.md#disclaimer) first. By running the scripts, you accept it.
+>
+> The setup steps follow the [SavaPage User Manual](https://manual.savapage.org/) by Rijk Ravestein ([CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)). For anything not covered here, see the manual.
 
 ### How commands are shown
 
@@ -27,7 +81,7 @@ Type or paste each command and press **Enter**. When you type a password, **noth
 7. [Set up SavaPage](#7-set-up-savapage)
 8. [Print to SavaPage from devices](#8-print-to-savapage-from-devices)
 
-Reference: [Install options](#install-options) · [CUPS web page](#cups-web-page) · [HTTPS redirect](#https-redirect) · [Updating the scripts](#updating-the-scripts) · [What the script changes](#what-the-script-changes) · [Moving the server](#moving-the-server-to-another-location) · [Everyday commands](#everyday-commands) · [Security](#security) · [Troubleshooting](#troubleshooting) · [Uninstall](#uninstall)
+Reference: [One-command Proxmox VM](#quickest-a-new-proxmox-vm-with-one-command) · [Install options](#install-options) · [CUPS web page](#cups-web-page) · [HTTPS redirect](#https-redirect) · [Updating the scripts](#updating-the-scripts) · [What the script changes](#what-the-script-changes) · [Moving the server](#moving-the-server-to-another-location) · [Everyday commands](#everyday-commands) · [Security](#security) · [Troubleshooting](#troubleshooting) · [Uninstall](#uninstall)
 
 ---
 
