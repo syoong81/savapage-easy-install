@@ -233,6 +233,14 @@ qm start "$var_vmid"
 # ---------------------------------------------------------------------------
 # 4. Wait for the first-boot install to finish
 # ---------------------------------------------------------------------------
+if (( PASSWORD_GENERATED )); then
+  cat <<EOF
+
+ VM login for $var_user: $var_password
+ Save this password now. It is shown again at the end.
+EOF
+fi
+
 log "Installing SavaPage inside the VM (about 5-15 minutes)"
 echo "Watch it live: click VM $var_vmid > Console in the web UI."
 
@@ -244,7 +252,7 @@ guest_out() {  # print a guest command's output (needs the guest agent)
 deadline=$(( $(date +%s) + WAIT_MINUTES * 60 ))
 rc=""
 while (( $(date +%s) < deadline )); do
-  if qm guest ping "$var_vmid" >/dev/null 2>&1; then
+  if qm guest cmd "$var_vmid" ping >/dev/null 2>&1; then
     rc=$(guest_out cat /var/log/savapage-install.exit | tr -dc '0-9' || true)
     [[ -n "$rc" ]] && break
   fi
@@ -280,13 +288,14 @@ cat <<EOF
  VM login      : $var_user
 EOF
 if (( PASSWORD_GENERATED )); then
-  echo " VM password   : $var_password   <-- save this now; it isn't shown again"
+  echo " VM password   : $var_password   <-- save this now"
 else
   echo " VM password   : (the one you set with var_password)"
 fi
 cat <<EOF
  SSH           : ssh $var_user@$VM_IP
  Console       : VM $var_vmid > Console in the Proxmox web UI
+ Lost password : on the Proxmox host, run: qm guest passwd $var_vmid $var_user
 
  Scripts in the VM: ~/savapage-easy-install/ (for re-runs and uninstall)
  Next steps    : see INSTALL.md
