@@ -146,6 +146,7 @@ The status screen then shows after you log in. **Forgot the root password?** In 
 
 **Good to know:**
 
+- Switching to **Summary** and back to **Console** reconnects you to the same shell, so you see what you left there. **Type `exit` to start a fresh console with the status screen.** `clear` (or Ctrl+L) also shows the status screen again.
 - Show the status any time with `savapage-status`. With a password (`var_password`), the console is a normal login prompt. If it's blank when you come back to it, press **Enter**. The status screen shows after you log in.
 - An unprivileged container can't keep kernel messages off its console. If `[UFW BLOCK]` lines ever fill it, run this once in the **Proxmox host shell**:
 

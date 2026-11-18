@@ -257,6 +257,9 @@ if [[ $- == *i* ]] && ! shopt -q login_shell && [ -z "${SSH_CONNECTION:-}${SAVAP
   cd "$HOME"
   printf '\033[3J\033[H\033[2J'
   /usr/local/bin/savapage-status
+  # In this console, 'clear' and Ctrl+L show the status screen again.
+  clear() { command clear "$@"; /usr/local/bin/savapage-status; }
+  bind -x '"\C-l": clear' 2>/dev/null
 fi
 # <<< savapage-console
 EOF
