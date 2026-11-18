@@ -13,6 +13,8 @@
 #   /etc/systemd/system/savapage-status.{service,timer}  refreshes the screen every minute
 #   /etc/issue.d/50-savapage.issue                      the text above the login prompt
 #   /etc/profile.d/zz-savapage-status.sh                 shows the status after logging in
+#   /etc/systemd/system/getty@tty1.service.d/savapage-clear.conf
+#                     (VMs only) clears the screen before the login prompt
 #
 set -uo pipefail
 
@@ -21,6 +23,7 @@ UNIT_DIR=/etc/systemd/system
 ISSUE_FILE=/etc/issue.d/50-savapage.issue
 PROFILE_FILE=/etc/profile.d/zz-savapage-status.sh
 INSTALL_DIR=/opt/savapage
+TTY1_DROPIN=/etc/systemd/system/getty@tty1.service.d/savapage-clear.conf
 
 # ---------------------------------------------------------------------------
 # Collect the status
@@ -106,8 +109,18 @@ update_issue() {
   new=$(render | sed 's/\\/\\\\/g')   # agetty treats backslashes as escapes
   if [[ ! -f "$ISSUE_FILE" ]] || [[ "$(cat "$ISSUE_FILE")" != "$new" ]]; then
     printf '%s\n' "$new" > "$ISSUE_FILE"
+    redraw_screen
     /sbin/agetty --reload 2>/dev/null || true
   fi
+}
+
+# On a VM's screen (tty1), start the login prompt again so it clears the screen and
+# shows only the status screen, like Home Assistant OS. Skipped while someone is
+# logged in there.
+redraw_screen() {
+  [[ -f "$TTY1_DROPIN" ]] || return 0
+  who 2>/dev/null | awk '{print $2}' | grep -qx tty1 && return 0
+  systemctl restart getty@tty1.service 2>/dev/null || true
 }
 
 # ---------------------------------------------------------------------------
@@ -150,8 +163,22 @@ esac
 EOF
   chmod 0644 "$PROFILE_FILE"
 
+  # VM / physical machine: clear the screen (tty1) before the login prompt, so old
+  # boot and install messages don't sit above the status screen. Not in containers,
+  # which use a different console.
+  if ! systemd-detect-virt -cq 2>/dev/null && systemctl cat getty@tty1.service >/dev/null 2>&1; then
+    mkdir -p "$(dirname "$TTY1_DROPIN")"
+    cat > "$TTY1_DROPIN" <<'EOF'
+# Added by savapage-status.sh: clear the screen before the login prompt.
+[Service]
+ExecStart=
+ExecStart=-/sbin/agetty -o '-- \\u' --noreset - $TERM
+EOF
+  fi
+
   systemctl daemon-reload
   systemctl enable --now savapage-status.timer >/dev/null 2>&1
+  rm -f "$ISSUE_FILE"   # so update_issue writes it and redraws the screen
   update_issue
   echo "SavaPage console status screen installed. Show it any time with: savapage-status"
 }
@@ -160,8 +187,8 @@ remove_screen() {
   need_root --remove
   systemctl disable --now savapage-status.timer >/dev/null 2>&1 || true
   rm -f "$UNIT_DIR/savapage-status.service" "$UNIT_DIR/savapage-status.timer" \
-        "$ISSUE_FILE" "$PROFILE_FILE" "$BIN"
-  rmdir /etc/issue.d 2>/dev/null || true
+        "$ISSUE_FILE" "$PROFILE_FILE" "$BIN" "$TTY1_DROPIN"
+  rmdir /etc/issue.d "$(dirname "$TTY1_DROPIN")" 2>/dev/null || true
   systemctl daemon-reload
   /sbin/agetty --reload 2>/dev/null || true
   echo "SavaPage console status screen removed."
