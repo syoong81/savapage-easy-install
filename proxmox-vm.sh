@@ -271,11 +271,16 @@ SNIPPET_PATH=$(pvesm path "$SNIP_STORAGE:snippets/$SNIPPET")
 mkdir -p "$(dirname "$SNIPPET_PATH")"
 
 HOME_DIR="/home/$var_user"
+# Same timezone as the Proxmox host, so the nightly updates (UPDATE_TIME) run at
+# that local time and not in UTC, the cloud image's default.
+HOST_TZ=$(timedatectl show -p Timezone --value 2>/dev/null || cat /etc/timezone 2>/dev/null || true)
+[[ "$HOST_TZ" =~ ^[A-Za-z0-9_+/-]+$ ]] || HOST_TZ=""
 cat > "$SNIPPET_PATH" <<EOF
 #cloud-config
 # SavaPage first-boot setup, created by proxmox-vm.sh for VM $var_vmid.
 # Proxmox needs this file to start the VM, so keep it.
 ssh_pwauth: true
+${HOST_TZ:+timezone: $HOST_TZ}
 package_update: true
 packages:
   - qemu-guest-agent

@@ -247,6 +247,7 @@ create_args=(
   --rootfs "$var_storage:$var_disk"
   --net0 "name=eth0,bridge=$var_bridge,ip=dhcp"
   --unprivileged 1 --features nesting=1 --onboot 1
+  --timezone host   # same timezone as the host, so the nightly updates run at local time
   --description "SavaPage print server, created by savapage-easy-install (proxmox-lxc.sh)."
 )
 if [[ -n "$var_password" ]]; then

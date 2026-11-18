@@ -421,6 +421,12 @@ EOF
   systemctl enable --now apt-daily.timer apt-daily-upgrade.timer >/dev/null 2>&1 || true
   systemctl restart apt-daily.timer apt-daily-upgrade.timer 2>/dev/null || true
   echo "Package lists refresh at $lists_time; updates install at $UPDATE_TIME (server time: $(date +%Z))."
+  server_tz=$(timedatectl show -p Timezone --value 2>/dev/null || cat /etc/timezone 2>/dev/null || echo UTC)
+  if [[ "$server_tz" == UTC || "$server_tz" == Etc/UTC ]]; then
+    UTC_WARNING=1
+    warn "The server's clock is set to UTC, so $UPDATE_TIME is UTC, not your local time."
+    warn "Set your timezone, e.g.: timedatectl set-timezone America/New_York  (list: timedatectl list-timezones)"
+  fi
 else
   # Turned off: undo this script's settings. The distribution's default (security
   # updates only) stays as it is.
@@ -480,6 +486,9 @@ cat <<EOF
  Next steps    : see INSTALL.md.
 ========================================================================
 EOF
+if [[ "${UTC_WARNING:-0}" == 1 ]]; then
+  warn "Automatic updates run at $UPDATE_TIME UTC. To use your local time: timedatectl set-timezone Your/Zone"
+fi
 if (( PRINTK_FAILED )); then
   warn "Kernel messages may still appear on the console. To stop them, run this in the Proxmox host shell:"
   warn "  echo '$PRINTK_SETTING' > $CONSOLE_CONF && sysctl -p $CONSOLE_CONF"

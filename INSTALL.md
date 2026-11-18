@@ -550,6 +550,7 @@ HTTPS_REDIRECT=0 bash ~/savapage-easy-install/install-savapage.sh
 - **03:00:** it installs the updates (like `apt-get upgrade`) and removes packages that are no longer needed.
 - **Only if an update needs it** (for example a new kernel), it **reboots** right after. SavaPage starts again by itself. Otherwise nothing restarts.
 - If the server was off at 03:00, it catches up the next time it starts.
+- **The times are the server's own clock.** VMs and containers made with the one-command scripts get the **Proxmox host's timezone**. On a machine you installed by hand, check with `timedatectl`. If it says UTC, set yours, e.g. `sudo timedatectl set-timezone America/New_York` (list them with `timedatectl list-timezones`). The installer warns if the server is on UTC.
 
 This doesn't update **SavaPage itself**. New SavaPage releases come from [savapage.org](https://www.savapage.org/).
 
