@@ -29,6 +29,14 @@ bash -c "$(curl -fsSL https://raw.githubusercontent.com/syoong81/savapage-easy-i
 
 See [INSTALL.md](INSTALL.md#quickest-a-new-proxmox-vm-with-one-command) for its settings. Log in to the VM as `admin` with the password it prints. To set a new one, run `qm guest passwd VMID admin` in the host shell (see [Logging in to the VM](INSTALL.md#logging-in-to-the-vm)).
 
+**Or as an LXC container,** which uses less memory. Also in the **Proxmox host shell**:
+
+```bash
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/syoong81/savapage-easy-install/main/proxmox-lxc.sh)"
+```
+
+Without a password, the container's Proxmox console logs `root` in automatically, like the community-scripts containers. See [INSTALL.md](INSTALL.md#quickest-a-new-proxmox-lxc-container-with-one-command).
+
 **By hand,** on an existing VM or physical machine:
 
 ```bash
@@ -58,7 +66,8 @@ The machine must be 64-bit Intel/AMD (x86_64). Raspberry Pi / ARM is not support
 |---|---|
 | `install-savapage.sh` | The install script |
 | `proxmox-vm.sh` | Run on a Proxmox host: creates a new VM with SavaPage installed, in one command |
-| `savapage-status.sh` | The console status screen (`proxmox-vm.sh` adds it): what's running, the IP and the web addresses |
+| `proxmox-lxc.sh` | Run on a Proxmox host: creates a new LXC container with SavaPage installed, in one command |
+| `savapage-status.sh` | The console status screen (`proxmox-vm.sh` and `proxmox-lxc.sh` add it): what's running, the IP and the web addresses |
 | `uninstall-savapage.sh` | The uninstall script. It backs up your data, removes SavaPage and checks the machine is clean for a reinstall. |
 | `INSTALL.md` | Step-by-step install guide for a VM / physical machine and a Proxmox LXC container |
 | `LICENSE` | MIT License for these scripts and guides |
@@ -69,6 +78,7 @@ The scripts and guides in this repository are released under the [MIT License](L
 
 - **SavaPage software:** © Datraverse B.V., licensed under the [GNU AGPL v3 or later](https://www.gnu.org/licenses/agpl-3.0.html). This repository does **not** include or modify any SavaPage code. The install script downloads the unmodified official installer from `download.savapage.org` and checks its checksum. If you modify SavaPage itself and let others use it over a network, the AGPL requires you to offer them your modified source code.
 - **SavaPage User Manual:** © Rijk Ravestein, licensed under [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/). The guides here are written independently. They follow the setup steps and settings that the [SavaPage manual](https://manual.savapage.org/) describes, and copy none of its text.
+- **community-scripts:** the automatic console login in `proxmox-lxc.sh` is adapted from [community-scripts](https://github.com/community-scripts/core) (MIT License, © tteck and community-scripts ORG).
 - **Other software the scripts install:** Java, CUPS, Debian/Ubuntu packages and cloud images all come straight from their official sources, under their own licenses. This repository doesn't redistribute any of them.
 
 ---

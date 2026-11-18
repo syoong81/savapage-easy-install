@@ -157,8 +157,16 @@ EOF
 
   cat > "$PROFILE_FILE" <<EOF
 # Show the SavaPage status after logging in (added by savapage-status.sh).
+# On the console (not SSH), clear the screen first so only the status shows.
 case "\$-" in
-  *i*) [ -x $BIN ] && $BIN ;;
+  *i*)
+    if [ -z "\${SSH_CONNECTION:-}\${SSH_TTY:-}" ]; then
+      case "\$(tty 2>/dev/null)" in
+        /dev/console|/dev/tty[0-9]*) printf '\033[3J\033[H\033[2J' ;;
+      esac
+    fi
+    [ -x $BIN ] && $BIN
+    ;;
 esac
 EOF
   chmod 0644 "$PROFILE_FILE"

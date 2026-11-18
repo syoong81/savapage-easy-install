@@ -80,6 +80,70 @@ var_ram=4096 CUPS_WEB=1 bash -c "$(curl -fsSL https://raw.githubusercontent.com/
 - The VM's first-boot settings are saved as a Proxmox *snippet*, e.g. `/var/lib/vz/snippets/savapage-122.yaml`. Proxmox needs that file to start the VM, so keep it. It contains no passwords. If no storage allows snippets, the script turns them on for `local`.
 - To remove the VM later: **VM → More → Remove**. Then delete its snippet file.
 
+---
+
+## Quickest: a new Proxmox LXC container with one command
+
+This creates a new **LXC container** with SavaPage already installed. A container uses less memory than a VM. Run it in the **Proxmox host shell**:
+
+```bash
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/syoong81/savapage-easy-install/main/proxmox-lxc.sh)"
+```
+
+It:
+
+1. **Downloads the official Debian 13 container template** with Proxmox's own template tool (`pveam`), which checks the template's checksum.
+2. **Creates the container:** next free ID, unprivileged, **nesting** turned on, 2 cores, 2 GB RAM, 8 GB disk, DHCP on `vmbr0`, starts with the host.
+3. **Installs SavaPage** inside it with this repo's installer. You see the install as it runs.
+4. **Adds the status screen** and, if you didn't set a password, **logs root in automatically on the Proxmox console**, like the community-scripts containers.
+5. **Prints the container's IP and the admin address** when it's done.
+
+Then continue at [step 4: Log in and change the password](#4-log-in-and-change-the-password). Inside the container, the scripts are in `/root/savapage-easy-install/`.
+
+**Settings.** Put them in front of `bash`, e.g. `var_ram=4096 bash -c "$(curl …)"`:
+
+| Setting | Default | What it changes |
+|---|---|---|
+| `var_os` | `debian` | `debian` or `ubuntu` |
+| `var_version` | `13` | Debian `13` or `12`; Ubuntu `26.04` |
+| `var_ctid` | next free ID | Container ID |
+| `var_hostname` | `savapage` | Container name and hostname |
+| `var_cpu` / `var_ram` / `var_swap` / `var_disk` | `2` / `2048` / `512` / `8` | Cores, RAM and swap in MB, disk in GB |
+| `var_storage` | `local-lvm`, or the first that fits | Storage for the container |
+| `var_bridge` | `vmbr0` | Network bridge |
+| `var_password` | none | Root password. **Without one, the console logs root in automatically.** |
+| `var_sshkey` | none | A public key file to allow for SSH as root |
+| `HTTPS_REDIRECT`, `CUPS_WEB`, `SKIP_FIREWALL` | | Passed on to the installer. See [Install options](#install-options). |
+
+### Logging in to the container
+
+| Login | User | Password |
+|---|---|---|
+| **Proxmox console**, no `var_password` | `root` | None: it logs in automatically |
+| **Proxmox console**, with `var_password` | `root` | Your `var_password` |
+| **SSH** | `root` | Only with a key (`var_sshkey`). Root password logins over SSH are off, Debian's default. |
+| **SavaPage's web admin** | `admin` | `admin` until you change it (step 4) |
+| `savapage` | — | **Can't log in.** It's SavaPage's own service account. |
+
+Automatic login is only for the Proxmox console, and only people who can already log in to Proxmox can open that. **To require a password on the console** later, set one: in the console run `passwd`. Then, to turn automatic login off, run:
+
+```bash
+rm /etc/systemd/system/container-getty@.service.d/autologin.conf /etc/systemd/system/console-getty.service.d/autologin.conf && systemctl daemon-reload
+```
+
+and restart the container. **Forgot the root password?** In the Proxmox host shell, run `pct enter CTID`, then `passwd`, then `exit`.
+
+**Good to know:**
+
+- The **status screen** shows when you log in on the console. If the console is blank when you come back to it, press **Enter**. Show the status any time with `savapage-status`.
+- An unprivileged container can't keep kernel messages off its console. If `[UFW BLOCK]` lines ever fill it, run this once in the **Proxmox host shell**:
+
+  ```bash
+  echo 'kernel.printk = 3 4 1 3' > /etc/sysctl.d/10-console.conf && sysctl -p /etc/sysctl.d/10-console.conf
+  ```
+
+- To remove the container later: **Container → More → Remove**.
+
 The rest of this guide is for installing **by hand**, on any VM, physical machine or LXC container.
 
 ---
