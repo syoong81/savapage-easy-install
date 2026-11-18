@@ -95,7 +95,7 @@ It:
 1. **Downloads the official Debian 13 container template** with Proxmox's own template tool (`pveam`), which checks the template's checksum.
 2. **Creates the container:** next free ID, unprivileged, **nesting** turned on, 2 cores, 2 GB RAM, 8 GB disk, DHCP on `vmbr0`, starts with the host.
 3. **Installs SavaPage** inside it with this repo's installer. You see the install as it runs.
-4. **Adds the status screen** and, if you didn't set a password, **logs root in automatically on the Proxmox console**, like the community-scripts containers.
+4. **Adds the status screen.** If you didn't set a password, the Proxmox **Console** opens straight to a root shell showing the SavaPage status, every time you open it, like the Home Assistant OS console.
 5. **Prints the container's IP and the admin address** when it's done.
 
 Then continue at [step 4: Log in and change the password](#4-log-in-and-change-the-password). Inside the container, the scripts are in `/root/savapage-easy-install/`.
@@ -111,7 +111,7 @@ Then continue at [step 4: Log in and change the password](#4-log-in-and-change-t
 | `var_cpu` / `var_ram` / `var_swap` / `var_disk` | `2` / `2048` / `512` / `8` | Cores, RAM and swap in MB, disk in GB |
 | `var_storage` | `local-lvm`, or the first that fits | Storage for the container |
 | `var_bridge` | `vmbr0` | Network bridge |
-| `var_password` | none | Root password. **Without one, the console logs root in automatically.** |
+| `var_password` | none | Root password. **Without one, the console opens without a password.** |
 | `var_sshkey` | none | A public key file to allow for SSH as root |
 | `HTTPS_REDIRECT`, `CUPS_WEB`, `SKIP_FIREWALL` | | Passed on to the installer. See [Install options](#install-options). |
 
@@ -119,23 +119,34 @@ Then continue at [step 4: Log in and change the password](#4-log-in-and-change-t
 
 | Login | User | Password |
 |---|---|---|
-| **Proxmox console**, no `var_password` | `root` | None: it logs in automatically |
+| **Proxmox console**, no `var_password` | `root` | None: it opens a root shell with the status screen |
 | **Proxmox console**, with `var_password` | `root` | Your `var_password` |
 | **SSH** | `root` | Only with a key (`var_sshkey`). Root password logins over SSH are off, Debian's default. |
 | **SavaPage's web admin** | `admin` | `admin` until you change it (step 4) |
 | `savapage` | — | **Can't log in.** It's SavaPage's own service account. |
 
-Automatic login is only for the Proxmox console, and only people who can already log in to Proxmox can open that. **To require a password on the console** later, set one: in the console run `passwd`. Then, to turn automatic login off, run:
+**How the passwordless console works.** The container's console is set to Proxmox's **shell** mode (*Options → Console mode*). Each time you open or refresh **Console**, Proxmox starts a new root shell inside the container, and it shows the status screen first. That's why the status is always there, even after `clear`. Only people who can already log in to Proxmox can open that console. `pct console CTID` on the host logs root in automatically as well.
 
-```bash
-rm /etc/systemd/system/container-getty@.service.d/autologin.conf /etc/systemd/system/console-getty.service.d/autologin.conf && systemctl daemon-reload
-```
+**To require a password on the console** later:
 
-and restart the container. **Forgot the root password?** In the Proxmox host shell, run `pct enter CTID`, then `passwd`, then `exit`.
+1. In the console, set a root password: `passwd`.
+2. Turn off automatic login, in the console:
+
+   ```bash
+   rm /etc/systemd/system/container-getty@.service.d/autologin.conf /etc/systemd/system/console-getty.service.d/autologin.conf && systemctl daemon-reload
+   ```
+
+3. In the **Proxmox host shell**, switch the console back to a login prompt, then restart the container:
+
+   ```bash
+   pct set CTID --cmode tty
+   ```
+
+The status screen then shows after you log in. **Forgot the root password?** In the Proxmox host shell, run `pct enter CTID`, then `passwd`, then `exit`.
 
 **Good to know:**
 
-- The **status screen** shows when you log in on the console. If the console is blank when you come back to it, press **Enter**. Show the status any time with `savapage-status`.
+- Show the status any time with `savapage-status`. With a password (`var_password`), the console is a normal login prompt. If it's blank when you come back to it, press **Enter**. The status screen shows after you log in.
 - An unprivileged container can't keep kernel messages off its console. If `[UFW BLOCK]` lines ever fill it, run this once in the **Proxmox host shell**:
 
   ```bash

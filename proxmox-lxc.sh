@@ -11,8 +11,9 @@
 # (savapage-status.sh).
 #
 # Console login, like the community-scripts containers:
-#   - No var_password (default): root logs in automatically on the Proxmox console.
-#     The root password is empty, so SSH needs a key (var_sshkey).
+#   - No var_password (default): the Proxmox console opens a root shell with the
+#     SavaPage status screen, every time ('shell' console mode). The root password
+#     is empty, so SSH needs a key (var_sshkey).
 #   - var_password=...: the console asks for that password.
 #
 # Optional settings (put them in front of 'bash'):
@@ -241,7 +242,28 @@ fi
 systemctl daemon-reload
 systemctl restart 'container-getty@*.service' 2>/dev/null || true
 systemctl try-restart console-getty.service 2>/dev/null || true
+
+# The Proxmox web console uses 'shell' mode (set below): every time it opens, it
+# starts a fresh root shell. Show the status screen there, so the console always
+# shows it, even after a refresh or 'clear'. Replaces an older copy of this block.
+sed -i '/^# >>> savapage-console/,/^# <<< savapage-console/d' /root/.bashrc
+cat >> /root/.bashrc <<'EOF'
+# >>> savapage-console (proxmox-lxc.sh): show the SavaPage status when the Proxmox console opens
+if [[ $- == *i* ]] && ! shopt -q login_shell && [ -z "${SSH_CONNECTION:-}${SAVAPAGE_STATUS_SHOWN:-}" ] && [ -x /usr/local/bin/savapage-status ]; then
+  export SAVAPAGE_STATUS_SHOWN=1
+  # The console starts with an empty environment.
+  export HOME="${HOME:-/root}" USER="${USER:-root}" LOGNAME="${LOGNAME:-root}"
+  export LANG="${LANG:-C.UTF-8}" TERM="${TERM:-linux}"
+  cd "$HOME"
+  printf '\033[3J\033[H\033[2J'
+  /usr/local/bin/savapage-status
+fi
+# <<< savapage-console
+EOF
 EOS
+  # 'shell' console mode: each time the Proxmox console opens, a new root shell
+  # starts inside the container (no login prompt) and shows the status screen.
+  pct set "$var_ctid" --cmode shell
 fi
 
 # ---------------------------------------------------------------------------
@@ -263,9 +285,8 @@ cat <<EOF
 EOF
 if [[ -z "$var_password" ]]; then
   cat <<EOF
- Console       : container $var_ctid > Console logs in as root automatically,
-                 and shows the SavaPage status. Press Enter if it's blank.
- Set a password: in the console, run: passwd
+ Console       : container $var_ctid > Console opens a root shell and shows
+                 the SavaPage status, every time you open it. No password.
 EOF
 else
   cat <<EOF

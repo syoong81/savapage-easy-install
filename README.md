@@ -35,7 +35,7 @@ See [INSTALL.md](INSTALL.md#quickest-a-new-proxmox-vm-with-one-command) for its 
 bash -c "$(curl -fsSL https://raw.githubusercontent.com/syoong81/savapage-easy-install/main/proxmox-lxc.sh)"
 ```
 
-Without a password, the container's Proxmox console logs `root` in automatically, like the community-scripts containers. See [INSTALL.md](INSTALL.md#quickest-a-new-proxmox-lxc-container-with-one-command).
+Without a password, the container's Proxmox console opens straight to a root shell with the SavaPage status, every time, like the Home Assistant OS console. See [INSTALL.md](INSTALL.md#quickest-a-new-proxmox-lxc-container-with-one-command).
 
 **By hand,** on an existing VM or physical machine:
 
