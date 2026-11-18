@@ -10,6 +10,18 @@ bash -c "$(curl -fsSL https://raw.githubusercontent.com/syoong81/savapage-easy-i
 
 **It opens a menu,** like the community-scripts: choose **Use the default settings**, or **Choose the settings** to pick the operating system (Debian 13, Debian 12 or **Ubuntu 26.04 LTS**), the VM ID, name, CPU, memory, disk, storage, network bridge, login user and password, and the install options. It shows everything once more before it creates the VM. Esc cancels without changing anything.
 
+**Using the menu:**
+
+| Key | Does |
+|---|---|
+| **↑ / ↓** | Move between choices |
+| **Space** | Select an option in a list with `( )` circles, such as the operating system |
+| **Enter** | Accept the screen and go to the next one. A box with a value already filled in keeps that value. |
+| **Tab** | Move between the text box and the **Ok / Cancel** (or **Yes / No**) buttons |
+| **Esc** | Cancel. Nothing is created. |
+
+To change a filled-in value, delete it with **Backspace** and type the new one. The password box shows nothing while you type, which is normal. Not sure which operating system to pick? See [Ubuntu or Debian?](#ubuntu-or-debian) below.
+
 With the default settings, it:
 
 1. **Downloads the official Debian 13 cloud image** and checks its SHA-512 checksum.
@@ -18,13 +30,13 @@ With the default settings, it:
 4. **Adds a status screen to the VM's console**, like the Home Assistant OS console: whether SavaPage and CUPS are running, the firewall, the IP address, the version and the web addresses. It refreshes every minute, so it follows the server to a new network.
 5. **Prints the VM's IP, the admin address and the VM login** when it's done, after about 3–15 minutes.
 
-**Save the VM password** it shows. It's random and shown twice: before the wait and at the end. If you lose it, see [Logging in to the VM](#logging-in-to-the-vm).
+**Save the VM password.** If you left the password empty in the menu, or didn't set `var_password`, the script makes a random one and shows it twice: before the wait and at the end. If you lose it, see [Logging in to the VM](#logging-in-to-the-vm).
 
 Then continue at [step 4: Log in and change the password](#4-log-in-and-change-the-password). Inside the VM, the scripts are in `~/savapage-easy-install/`, for re-runs and uninstalling.
 
 ### Logging in to the VM
 
-For updates and maintenance, log in to the VM as **`admin`** on Debian or **`ubuntu`** on Ubuntu (or the name you set with `var_user`), on **Console** or with `ssh admin@VM-IP`. That user can use `sudo` without typing a password again, so give it a strong password. In the commands below, use `ubuntu` instead of `admin` on an Ubuntu VM.
+For updates and maintenance, log in to the VM as **`admin`** on Debian or **`ubuntu`** on Ubuntu (or the user you chose in the menu or with `var_user`), on **Console** or with `ssh admin@VM-IP`. That user can use `sudo` without typing a password again, so give it a strong password. In the commands below, use `ubuntu` instead of `admin` on an Ubuntu VM.
 
 There are three different logins. Don't mix them up:
 
@@ -53,6 +65,8 @@ passwd
 ```bash
 sudo apt update && sudo apt full-upgrade -y
 ```
+
+<a id="ubuntu-or-debian"></a>**Ubuntu or Debian?** Both run SavaPage the same way and get automatic security updates. **Debian** is lighter (about 100 MB less RAM and 1 GB less disk) and very stable, with about 5 years of updates. **Ubuntu LTS** is a little heavier but supported longer: 5 years, or 10 with Ubuntu Pro (free for personal use). Choose Ubuntu if you want to leave the server alone for as long as possible.
 
 **Settings without the menu.** Put them in front of `bash`. Any setting skips the menu (add `var_menu=1` to show it anyway). For example:
 
@@ -92,7 +106,7 @@ This creates a new **LXC container** with SavaPage already installed. A containe
 bash -c "$(curl -fsSL https://raw.githubusercontent.com/syoong81/savapage-easy-install/main/proxmox-lxc.sh)"
 ```
 
-**It opens the same kind of menu:** **Use the default settings**, or **Choose the settings** (operating system, container ID, name, CPU, memory, swap, disk, storage, network bridge, root password and install options).
+**It opens the same kind of menu** (same keys as above): **Use the default settings**, or **Choose the settings** (operating system, container ID, name, CPU, memory, swap, disk, storage, network bridge, root password and install options). Leave the root password empty for the passwordless console with the status screen.
 
 With the default settings, it:
 

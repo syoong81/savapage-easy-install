@@ -55,6 +55,7 @@ In a Proxmox LXC container's console you're root, so leave out `sudo`. Then open
 |---|---|
 | Debian 13 (trixie), Proxmox LXC container | ✅ Tested: install, ufw firewall, web apps, IPP printing, HTTPS redirect (on by default and turned off), re-running the script, start after reboot, uninstall script and reinstall |
 | Ubuntu 26.04 LTS, Proxmox VM | ✅ Tested: install, ufw firewall, web apps, IPP printing, HTTPS redirect on by default, uninstall script (all options) and reinstall |
+| Ubuntu 26.04 LTS, new VM from `proxmox-vm.sh` on Proxmox VE 9.2 | ✅ Tested: one-command VM creation (command-line setting and the menu), login user `ubuntu`, install, status screen |
 | Debian 13, new VM from `proxmox-vm.sh` on Proxmox VE 9.2 | ✅ Tested: one-command VM creation, install, ufw firewall, web apps, IPP printing, CUPS web page (`CUPS_WEB=1`) |
 | Debian 12 (bookworm) | Supported, not yet tested |
 
