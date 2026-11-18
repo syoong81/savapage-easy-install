@@ -57,6 +57,8 @@ In a Proxmox LXC container's console you're root, so leave out `sudo`. Then open
 | Ubuntu 26.04 LTS, Proxmox VM | ✅ Tested: install, ufw firewall, web apps, IPP printing, HTTPS redirect on by default, uninstall script (all options) and reinstall |
 | Ubuntu 26.04 LTS, new VM from `proxmox-vm.sh` on Proxmox VE 9.2 | ✅ Tested: one-command VM creation (command-line setting and the menu), login user `ubuntu`, install, status screen |
 | Debian 13, new VM from `proxmox-vm.sh` on Proxmox VE 9.2 | ✅ Tested: one-command VM creation, install, ufw firewall, web apps, IPP printing, CUPS web page (`CUPS_WEB=1`) |
+| Ubuntu 26.04 LTS, new LXC container from `proxmox-lxc.sh` on Proxmox VE 9.2 | ✅ Tested: one-command container creation, install, status-screen console, nightly automatic updates set up |
+| Automatic nightly updates (Ubuntu VM and Debian container) | ✅ Tested: the 03:00 run installed all updates at local time; the Ubuntu VM rebooted itself because an update needed it, and SavaPage came back |
 | Debian 12 (bookworm) | Supported, not yet tested |
 
 The machine must be 64-bit Intel/AMD (x86_64). Raspberry Pi / ARM is not supported, because SavaPage only publishes x86_64 installers.
