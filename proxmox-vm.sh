@@ -212,11 +212,14 @@ EOF
 # ---------------------------------------------------------------------------
 # 3. Create the VM
 # ---------------------------------------------------------------------------
+# A normal screen (VGA) is the main console, like Home Assistant OS: it keeps showing
+# the status screen when you come back to it. The serial port stays as a second
+# console with copy and paste (Console > xterm.js).
 log "Creating VM $var_vmid"
 qm create "$var_vmid" --name "$var_hostname" --ostype l26 \
   --cores "$var_cpu" --memory "$var_ram" \
   --scsihw virtio-scsi-single --net0 "virtio,bridge=$var_bridge" \
-  --agent enabled=1 --serial0 socket --vga serial0 --onboot 1 \
+  --agent enabled=1 --vga std --serial0 socket --onboot 1 \
   --description "SavaPage print server, created by savapage-easy-install (proxmox-vm.sh)."
 
 log "Importing the disk to $var_storage"

@@ -42,7 +42,7 @@ var_ram=4096 CUPS_WEB=1 bash -c "$(curl -fsSL https://raw.githubusercontent.com/
 
 **Good to know:**
 
-- The VM uses Proxmox's **serial console**, so **Console** in the web UI supports copy and paste.
+- **Console** in the web UI shows the VM's screen, with the status screen and the login prompt, like the Home Assistant OS console. It doesn't support copy and paste. For that, use **Console ▾ → xterm.js**, the VM's serial console, and press **Enter** to show the login prompt.
 - The **status screen** shows above the login prompt and again after you log in. Show it any time with `savapage-status`. To remove it: `sudo bash ~/savapage-easy-install/savapage-status.sh --remove`. To add it to a machine you installed by hand: `sudo bash ~/savapage-easy-install/savapage-status.sh --install`.
 - SSH logins with the VM password are allowed: `ssh admin@VM-IP`.
 - The VM's first-boot settings are saved as a Proxmox *snippet*, e.g. `/var/lib/vz/snippets/savapage-122.yaml`. Proxmox needs that file to start the VM, so keep it. It contains no passwords. If no storage allows snippets, the script turns them on for `local`.
