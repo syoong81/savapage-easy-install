@@ -16,9 +16,41 @@ It:
 4. **Adds a status screen to the VM's console**, like the Home Assistant OS console: whether SavaPage and CUPS are running, the firewall, the IP address, the version and the web addresses. It refreshes every minute, so it follows the server to a new network.
 5. **Prints the VM's IP, the admin address and the VM login** when it's done, after about 3–15 minutes.
 
-**Save the VM password** it shows. It's random and shown twice: before the wait and at the end. If you lose it, run `qm guest passwd VMID admin` in the host shell to set a new one.
+**Save the VM password** it shows. It's random and shown twice: before the wait and at the end. If you lose it, see [Logging in to the VM](#logging-in-to-the-vm).
 
 Then continue at [step 4: Log in and change the password](#4-log-in-and-change-the-password). Inside the VM, the scripts are in `~/savapage-easy-install/`, for re-runs and uninstalling.
+
+### Logging in to the VM
+
+For updates and maintenance, log in to the VM as **`admin`** (or the name you set with `var_user`), on **Console** or with `ssh admin@VM-IP`. `admin` can use `sudo` without typing a password again, so give it a strong password.
+
+There are three different logins. Don't mix them up:
+
+| Login | User | Password |
+|---|---|---|
+| **The VM** (console, SSH) | `admin` | The random one `proxmox-vm.sh` printed, or your `var_password` |
+| **SavaPage's web admin** (`https://VM-IP:8632/admin`) | `admin` | `admin` until you change it (step 4). Separate from the VM's login. |
+| `savapage` | — | **Can't log in.** It's SavaPage's own service account, with no password. Leave it that way. |
+
+**Set or reset the VM password.** In the **Proxmox host shell** (node → **Shell**), replace `118` with your VM ID:
+
+```bash
+qm guest passwd 118 admin
+```
+
+It asks for the new password twice. This works without knowing the old password, through the guest agent.
+
+**Change it from inside the VM,** when you're logged in as `admin`:
+
+```bash
+passwd
+```
+
+**Install updates,** logged in as `admin`:
+
+```bash
+sudo apt update && sudo apt full-upgrade -y
+```
 
 **Settings.** Put them in front of `bash`, e.g.:
 
@@ -578,6 +610,9 @@ On a VM, put `sudo` in front of each command.
 | Restart SavaPage | `systemctl restart savapage` |
 | Firewall rules | `ufw status verbose` |
 | Install OS updates | `apt update && apt upgrade` |
+| Change your login password | `passwd` |
+| Reset a VM's login password (on the **Proxmox host**) | `qm guest passwd VMID admin` |
+| Reset a container's root password (on the **Proxmox host**) | `pct enter CTID`, then `passwd`, then `exit` |
 | Edit SavaPage's settings | `nano /opt/savapage/server/data/server.properties` |
 | Log files | `ls /opt/savapage/server/logs/` |
 
@@ -611,6 +646,8 @@ On a VM, put `sudo` in front of each command.
 | Nothing at `SERVER-IP:631` (CUPS page) | That's the default: CUPS only listens on the server itself. Turn it on with `CUPS_WEB=1`. See [CUPS web page](#cups-web-page). |
 | Printers don't show in SavaPage | Check CUPS sees them with `lpstat -p`. Make sure each one is shared: `lpadmin -p NAME -o printer-is-shared=true`. |
 | Forgot the admin password | See the [SavaPage manual](https://manual.savapage.org/). |
+| Forgot the VM login password | In the Proxmox host shell: `qm guest passwd VMID admin`. See [Logging in to the VM](#logging-in-to-the-vm). |
+| `savapage` / `savapage` doesn't log in | That's SavaPage's service account, which can't log in. Use `admin` (VM) or `root` (container). |
 
 ## Uninstall
 
