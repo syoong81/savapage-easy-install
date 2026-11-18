@@ -164,7 +164,14 @@ create_args=(
   --unprivileged 1 --features nesting=1 --onboot 1
   --description "SavaPage print server, created by savapage-easy-install (proxmox-lxc.sh)."
 )
-[[ -n "$var_password" ]] && create_args+=(--password "$var_password")
+if [[ -n "$var_password" ]]; then
+  create_args+=(--password "$var_password")
+else
+  # 'shell' console mode from the start: Proxmox keeps the first console session
+  # running (dtach), so a console opened during the install would otherwise stay a
+  # login console.
+  create_args+=(--cmode shell)
+fi
 [[ -n "${var_sshkey:-}" ]] && create_args+=(--ssh-public-keys "$var_sshkey")
 pct create "$var_ctid" "$TEMPLATE_STORAGE:vztmpl/$TEMPLATE" "${create_args[@]}" >/dev/null
 
@@ -243,7 +250,7 @@ systemctl daemon-reload
 systemctl restart 'container-getty@*.service' 2>/dev/null || true
 systemctl try-restart console-getty.service 2>/dev/null || true
 
-# The Proxmox web console uses 'shell' mode (set below): every time it opens, it
+# The Proxmox web console uses 'shell' mode (set at creation): when it opens, it
 # starts a fresh root shell. Show the status screen there, so the console always
 # shows it, even after a refresh or 'clear'. Replaces an older copy of this block.
 sed -i '/^# >>> savapage-console/,/^# <<< savapage-console/d' /root/.bashrc
@@ -260,13 +267,13 @@ if [[ $- == *i* ]] && ! shopt -q login_shell && [ -z "${SSH_CONNECTION:-}${SAVAP
   # In this console, 'clear' and Ctrl+L show the status screen again.
   clear() { command clear "$@"; /usr/local/bin/savapage-status; }
   bind -x '"\C-l": clear' 2>/dev/null
+  # Proxmox keeps this shell running between visits (dtach) and reattaches it when
+  # Console opens again, which resizes the terminal (WINCH). Redraw the status then.
+  trap 'command clear; /usr/local/bin/savapage-status; printf "%s" "${PS1@P}"' WINCH
 fi
 # <<< savapage-console
 EOF
 EOS
-  # 'shell' console mode: each time the Proxmox console opens, a new root shell
-  # starts inside the container (no login prompt) and shows the status screen.
-  pct set "$var_ctid" --cmode shell
 fi
 
 # ---------------------------------------------------------------------------
