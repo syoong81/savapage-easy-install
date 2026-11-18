@@ -18,6 +18,9 @@
 #                                (default: 1 = redirect on; IPP printing is never redirected)
 #   CUPS_WEB=1                   Open the CUPS web interface (port 631) to the local network
 #                                (default: 0 = CUPS only reachable from the server itself)
+#   AUTO_UPDATES=0               Don't install updates automatically
+#                                (default: 1 = all updates every night, reboot only if needed)
+#   UPDATE_TIME=03:00            When the nightly updates run (24-hour clock, server time)
 #
 set -euo pipefail
 
@@ -27,6 +30,8 @@ SAVAPAGE_USER="savapage"
 SAVAPAGE_VERSION="${SAVAPAGE_VERSION:-1.7.0-final}"
 HTTPS_REDIRECT="${HTTPS_REDIRECT:-1}"
 CUPS_WEB="${CUPS_WEB:-0}"
+AUTO_UPDATES="${AUTO_UPDATES:-1}"
+UPDATE_TIME="${UPDATE_TIME:-03:00}"
 
 # Ports SavaPage needs (see manual, "Check Firewall Settings").
 OPEN_TCP_PORTS="22 8631 8632 9100"   # SSH, HTTP, HTTPS, JetDirect/RAW printing
@@ -54,6 +59,8 @@ case "${ID:-}:${VERSION_ID:-}" in
 esac
 
 [[ "$(uname -m)" == "x86_64" ]] || die "SavaPage installers are published for x86_64 (64-bit Intel/AMD) only."
+
+[[ "$UPDATE_TIME" =~ ^([01][0-9]|2[0-3]):[0-5][0-9]$ ]] || die "UPDATE_TIME='$UPDATE_TIME' is not a time like 03:00 (24-hour clock)."
 
 command -v systemctl >/dev/null || die "systemd is required."
 
@@ -369,7 +376,65 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# 9. Check the service
+# 9. Automatic updates (on by default): set and forget
+# ---------------------------------------------------------------------------
+# unattended-upgrades, the distribution's own tool, installs ALL updates every night
+# at UPDATE_TIME (not only security ones, at a random time, as by default), removes
+# packages that are no longer needed, and reboots only when an update requires it.
+UPGRADES_CONF=/etc/apt/apt.conf.d/52savapage-auto-updates
+LISTS_DROPIN=/etc/systemd/system/apt-daily.timer.d/savapage-time.conf
+UPGRADE_DROPIN=/etc/systemd/system/apt-daily-upgrade.timer.d/savapage-time.conf
+
+if [[ "$AUTO_UPDATES" == "1" ]]; then
+  log "Turning on automatic updates (every night at $UPDATE_TIME)"
+  apt-get install -y -q unattended-upgrades
+
+  if [[ "${ID:-}" == ubuntu ]]; then
+    updates_origin='"${distro_id}:${distro_codename}-updates";'
+    origins_key=Allowed-Origins
+  else
+    updates_origin='"origin=Debian,codename=${distro_codename}-updates";'
+    origins_key=Origins-Pattern
+  fi
+  cat > "$UPGRADES_CONF" <<EOF
+// Added by install-savapage.sh: install all updates every night, reboot only if needed.
+// Remove this file to go back to the distribution's default (security updates only).
+APT::Periodic::Update-Package-Lists "1";
+APT::Periodic::Unattended-Upgrade "1";
+APT::Periodic::AutocleanInterval "7";
+Unattended-Upgrade::$origins_key { $updates_origin };
+Unattended-Upgrade::Remove-Unused-Dependencies "true";
+Unattended-Upgrade::Remove-Unused-Kernel-Packages "true";
+Unattended-Upgrade::Automatic-Reboot "true";
+Unattended-Upgrade::Automatic-Reboot-Time "now";
+EOF
+
+  # Fixed times instead of the default random ones: fetch the package lists 30
+  # minutes before UPDATE_TIME, then install at UPDATE_TIME.
+  lists_time=$(date -d "@$(( $(date -d "today $UPDATE_TIME" +%s) - 1800 ))" +%H:%M)
+  mkdir -p "$(dirname "$LISTS_DROPIN")" "$(dirname "$UPGRADE_DROPIN")"
+  printf '# Added by install-savapage.sh\n[Timer]\nOnCalendar=\nOnCalendar=*-*-* %s\nRandomizedDelaySec=0\nPersistent=true\n' \
+    "$lists_time" > "$LISTS_DROPIN"
+  printf '# Added by install-savapage.sh\n[Timer]\nOnCalendar=\nOnCalendar=*-*-* %s\nRandomizedDelaySec=0\nPersistent=true\n' \
+    "$UPDATE_TIME" > "$UPGRADE_DROPIN"
+  systemctl daemon-reload
+  systemctl enable --now apt-daily.timer apt-daily-upgrade.timer >/dev/null 2>&1 || true
+  systemctl restart apt-daily.timer apt-daily-upgrade.timer 2>/dev/null || true
+  echo "Package lists refresh at $lists_time; updates install at $UPDATE_TIME (server time: $(date +%Z))."
+else
+  # Turned off: undo this script's settings. The distribution's default (security
+  # updates only) stays as it is.
+  if [[ -f "$UPGRADES_CONF" || -f "$UPGRADE_DROPIN" ]]; then
+    log "Turning off this script's automatic update settings (AUTO_UPDATES=0)"
+    rm -f "$UPGRADES_CONF" "$LISTS_DROPIN" "$UPGRADE_DROPIN"
+    rmdir "$(dirname "$LISTS_DROPIN")" "$(dirname "$UPGRADE_DROPIN")" 2>/dev/null || true
+    systemctl daemon-reload
+    systemctl restart apt-daily.timer apt-daily-upgrade.timer 2>/dev/null || true
+  fi
+fi
+
+# ---------------------------------------------------------------------------
+# 10. Check the service
 # ---------------------------------------------------------------------------
 log "Waiting for SavaPage to start"
 for _ in $(seq 1 60); do
@@ -404,6 +469,7 @@ cat <<EOF
 
  HTTP redirect : $( [[ "$redirect_value" == true ]] && echo "on (http://$HOST_IP:8631 goes to HTTPS)" || echo "off" )
  CUPS web page : $( [[ "$CUPS_WEB" == 1 ]] && echo "on (http://$HOST_IP:631, local network only)" || echo "off (local only; CUPS_WEB=1 opens it)" )
+ Auto updates  : $( [[ "$AUTO_UPDATES" == 1 ]] && echo "on (every night at $UPDATE_TIME; reboots only if needed)" || echo "off (AUTO_UPDATES=1 turns them on)" )
 
  Your browser will warn about the self-signed certificate. That is
  expected; accept it to continue.

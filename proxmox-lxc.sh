@@ -36,6 +36,7 @@
 #
 # Install options passed on to install-savapage.sh:
 #   HTTPS_REDIRECT=0  CUPS_WEB=1  SKIP_FIREWALL=1
+#   AUTO_UPDATES=0    UPDATE_TIME=03:00   (default: all updates every night at 03:00)
 #
 # Example:
 #   var_ram=4096 CUPS_WEB=1 bash -c "$(curl -fsSL https://raw.githubusercontent.com/syoong81/savapage-easy-install/main/proxmox-lxc.sh)"
@@ -48,7 +49,8 @@ REPO_DIR="/root/savapage-easy-install"
 # Show the menu only when no settings were given on the command line.
 SHOW_MENU=1
 for v in var_os var_version var_ctid var_hostname var_cpu var_ram var_swap var_disk var_storage \
-         var_bridge var_password var_sshkey HTTPS_REDIRECT CUPS_WEB SKIP_FIREWALL; do
+         var_bridge var_password var_sshkey HTTPS_REDIRECT CUPS_WEB SKIP_FIREWALL \
+         AUTO_UPDATES UPDATE_TIME; do
   [[ -n "${!v:-}" ]] && SHOW_MENU=0
 done
 case "${var_menu:-}" in 0) SHOW_MENU=0 ;; 1) SHOW_MENU=1 ;; esac
@@ -64,6 +66,8 @@ var_password="${var_password:-}"
 HTTPS_REDIRECT="${HTTPS_REDIRECT:-1}"
 CUPS_WEB="${CUPS_WEB:-0}"
 SKIP_FIREWALL="${SKIP_FIREWALL:-0}"
+AUTO_UPDATES="${AUTO_UPDATES:-1}"
+UPDATE_TIME="${UPDATE_TIME:-03:00}"
 
 log()  { printf '\n\033[1;34m==> %s\033[0m\n' "$*"; }
 warn() { printf '\033[1;33m[!] %s\033[0m\n' "$*" >&2; }
@@ -92,7 +96,7 @@ pick_from() {  # pick_from "question" item... : a menu of items, or the only ite
 
 settings_menu() {
   local choice os
-  choice=$(wt --menu "Create a new Proxmox LXC container with SavaPage installed.\n\nDefault settings: Debian 13, unprivileged, 2 cores, 2 GB RAM, 8 GB disk, DHCP on vmbr0, HTTPS redirect on, firewall on, no root password (the Proxmox console opens straight to the status screen)." 18 72 2 \
+  choice=$(wt --menu "Create a new Proxmox LXC container with SavaPage installed.\n\nDefault settings: Debian 13, unprivileged, 2 cores, 2 GB RAM, 8 GB disk, DHCP on vmbr0, HTTPS redirect on, firewall on, all updates installed every night at 03:00, no root password (the Proxmox console opens straight to the status screen)." 19 72 2 \
     default  "Use the default settings" \
     advanced "Choose the settings") || cancelled
   [[ "$choice" == advanced ]] || return 0
@@ -121,6 +125,12 @@ settings_menu() {
   if wt --yesno "Send browsers on http://...:8631 to the secure HTTPS address?\n\n(Recommended.)" 10 64; then HTTPS_REDIRECT=1; else HTTPS_REDIRECT=0; fi
   if wt --defaultno --yesno "Open the CUPS web page (port 631) to your local network?\n\n(Off by default. Handy for adding printers.)" 10 64; then CUPS_WEB=1; else CUPS_WEB=0; fi
   if wt --yesno "Turn on the firewall (ufw) inside the container?\n\n(Recommended.)" 10 64; then SKIP_FIREWALL=0; else SKIP_FIREWALL=1; fi
+  if wt --yesno "Install all updates automatically every night?\n\nThe container restarts afterwards only when an update needs it. (Recommended for a set-and-forget server.)" 11 66; then
+    AUTO_UPDATES=1
+    UPDATE_TIME=$(wt --inputbox "Time for the nightly updates (24-hour clock, e.g. 03:00)" 8 60 "$UPDATE_TIME") || cancelled
+  else
+    AUTO_UPDATES=0
+  fi
 
   wt --yesno "Create the container with these settings?\n
   OS        : $var_os $var_version
@@ -130,7 +140,8 @@ settings_menu() {
   Disk      : $var_disk GB on $var_storage
   Network   : $var_bridge (DHCP)
   Login     : root, $([[ -n "$var_password" ]] && echo "with your password" || echo "no password (console opens directly)")
-  HTTPS redirect: $( ((HTTPS_REDIRECT)) && echo on || echo off ), CUPS web page: $( ((CUPS_WEB)) && echo on || echo off ), firewall: $( ((SKIP_FIREWALL)) && echo off || echo on )" 20 70 || cancelled
+  HTTPS redirect: $( ((HTTPS_REDIRECT)) && echo on || echo off ), CUPS web page: $( ((CUPS_WEB)) && echo on || echo off ), firewall: $( ((SKIP_FIREWALL)) && echo off || echo on )
+  Updates   : $( ((AUTO_UPDATES)) && echo "every night at $UPDATE_TIME" || echo off )" 21 70 || cancelled
 }
 
 if (( SHOW_MENU )) && [[ -t 0 && -t 1 ]] && command -v whiptail >/dev/null; then
@@ -151,6 +162,7 @@ esac
 TEMPLATE_PREFIX="${var_os}-${var_version}-standard"
 
 [[ "$var_hostname" =~ ^[a-zA-Z0-9][a-zA-Z0-9-]{0,62}$ ]] || die "var_hostname='$var_hostname' is not a valid host name."
+[[ "$UPDATE_TIME" =~ ^([01][0-9]|2[0-3]):[0-5][0-9]$ ]] || die "UPDATE_TIME='$UPDATE_TIME' is not a time like 03:00 (24-hour clock)."
 for n in var_cpu var_ram var_swap var_disk; do
   [[ "${!n}" =~ ^[0-9]+$ ]] || die "$n must be a number (got '${!n}')."
 done
@@ -207,6 +219,7 @@ cat <<EOF
    Network   : $var_bridge (DHCP)
    Login     : $LOGIN_TEXT
    Options   : HTTPS_REDIRECT=$HTTPS_REDIRECT CUPS_WEB=$CUPS_WEB SKIP_FIREWALL=$SKIP_FIREWALL
+   Updates   : $( [[ "$AUTO_UPDATES" == 1 ]] && echo "all updates every night at $UPDATE_TIME" || echo off )
 EOF
 
 # ---------------------------------------------------------------------------
@@ -272,6 +285,7 @@ in_ct bash -c "apt-get update -qq && apt-get install -y -qq git ca-certificates 
 in_ct bash -c "rm -rf $REPO_DIR && git clone -q $REPO_URL $REPO_DIR" \
   || die "Could not download the scripts from $REPO_URL."
 in_ct env HTTPS_REDIRECT="$HTTPS_REDIRECT" CUPS_WEB="$CUPS_WEB" SKIP_FIREWALL="$SKIP_FIREWALL" \
+  AUTO_UPDATES="$AUTO_UPDATES" UPDATE_TIME="$UPDATE_TIME" \
   bash "$REPO_DIR/install-savapage.sh" \
   || die "The SavaPage install failed. Fix the problem, then in the container's console run: bash $REPO_DIR/install-savapage.sh"
 

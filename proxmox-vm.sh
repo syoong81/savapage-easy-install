@@ -2,12 +2,12 @@
 #
 # proxmox-vm.sh - Create a new Proxmox VM with SavaPage installed, in one command.
 #
-# Tested on Proxmox VE 9.2 with the default Debian 13 cloud image.
+# Tested on Proxmox VE 9.2 with the Ubuntu 26.04 LTS (default) and Debian 13 cloud images.
 #
 # Run this on the Proxmox HOST (Node > Shell in the web UI), as root:
 #   bash -c "$(curl -fsSL https://raw.githubusercontent.com/syoong81/savapage-easy-install/main/proxmox-vm.sh)"
 #
-# It downloads an official Debian (or Ubuntu) cloud image, verifies its checksum,
+# It downloads an official Ubuntu LTS (or Debian) cloud image, verifies its checksum,
 # creates a VM with cloud-init, and installs SavaPage on the VM's first boot with
 # install-savapage.sh from this repository. It also adds a status screen to the VM's
 # console (savapage-status.sh): what's running, the IP address and the web addresses.
@@ -17,8 +17,8 @@
 #
 # Optional settings (put them in front of 'bash'; any of them skips the menu):
 #   var_menu=1              Show the menu anyway (var_menu=0: never show it)
-#   var_os=debian           debian (default) or ubuntu
-#   var_version=13          Debian: 13 (default) or 12. Ubuntu: 26.04 (default)
+#   var_os=ubuntu           ubuntu (default, longest support) or debian
+#   var_version=26.04       Ubuntu: 26.04 (default). Debian: 13 (default) or 12
 #   var_vmid=120            VM ID (default: next free ID)
 #   var_hostname=savapage   VM name and hostname
 #   var_cpu=2               CPU cores
@@ -32,6 +32,7 @@
 #
 # Install options passed on to install-savapage.sh:
 #   HTTPS_REDIRECT=0  CUPS_WEB=1  SKIP_FIREWALL=1
+#   AUTO_UPDATES=0    UPDATE_TIME=03:00   (default: all updates every night at 03:00)
 #
 # Example:
 #   var_ram=4096 CUPS_WEB=1 bash -c "$(curl -fsSL https://raw.githubusercontent.com/syoong81/savapage-easy-install/main/proxmox-vm.sh)"
@@ -43,12 +44,13 @@ REPO_URL="https://github.com/syoong81/savapage-easy-install.git"
 # Show the menu only when no settings were given on the command line.
 SHOW_MENU=1
 for v in var_os var_version var_vmid var_hostname var_cpu var_ram var_disk var_storage \
-         var_bridge var_user var_password var_sshkey HTTPS_REDIRECT CUPS_WEB SKIP_FIREWALL; do
+         var_bridge var_user var_password var_sshkey HTTPS_REDIRECT CUPS_WEB SKIP_FIREWALL \
+         AUTO_UPDATES UPDATE_TIME; do
   [[ -n "${!v:-}" ]] && SHOW_MENU=0
 done
 case "${var_menu:-}" in 0) SHOW_MENU=0 ;; 1) SHOW_MENU=1 ;; esac
 
-var_os="${var_os:-debian}"
+var_os="${var_os:-ubuntu}"
 var_hostname="${var_hostname:-savapage}"
 var_cpu="${var_cpu:-2}"
 var_ram="${var_ram:-2048}"
@@ -57,6 +59,8 @@ var_bridge="${var_bridge:-vmbr0}"
 HTTPS_REDIRECT="${HTTPS_REDIRECT:-1}"
 CUPS_WEB="${CUPS_WEB:-0}"
 SKIP_FIREWALL="${SKIP_FIREWALL:-0}"
+AUTO_UPDATES="${AUTO_UPDATES:-1}"
+UPDATE_TIME="${UPDATE_TIME:-03:00}"
 
 WAIT_MINUTES=30
 
@@ -88,15 +92,15 @@ pick_from() {  # pick_from "question" item... : a menu of items, or the only ite
 
 settings_menu() {
   local choice os default_user
-  choice=$(wt --menu "Create a new Proxmox VM with SavaPage installed.\n\nDefault settings: Debian 13, 2 cores, 2 GB RAM, 16 GB disk, DHCP on vmbr0, HTTPS redirect on, firewall on, login user 'admin' with a random password." 17 72 2 \
+  choice=$(wt --menu "Create a new Proxmox VM with SavaPage installed.\n\nDefault settings: Ubuntu 26.04 LTS, 2 cores, 2 GB RAM, 16 GB disk, DHCP on vmbr0, HTTPS redirect on, firewall on, all updates installed every night at 03:00, login user 'ubuntu' with a random password." 18 72 2 \
     default  "Use the default settings" \
     advanced "Choose the settings") || cancelled
   [[ "$choice" == advanced ]] || return 0
 
   os=$(wt --radiolist "Operating system (Space to select, Enter to continue)" 12 66 3 \
-    debian-13    "Debian 13 (trixie)" ON \
-    debian-12    "Debian 12 (bookworm)" OFF \
-    ubuntu-26.04 "Ubuntu 26.04 LTS (longest support)" OFF) || cancelled
+    ubuntu-26.04 "Ubuntu 26.04 LTS (longest support)" ON \
+    debian-13    "Debian 13 (trixie, lighter)" OFF \
+    debian-12    "Debian 12 (bookworm)" OFF) || cancelled
   var_os=${os%%-*}; var_version=${os#*-}
 
   var_vmid=$(wt --inputbox "VM ID" 8 60 "$(pvesh get /cluster/nextid)") || cancelled
@@ -118,6 +122,12 @@ settings_menu() {
   if wt --yesno "Send browsers on http://...:8631 to the secure HTTPS address?\n\n(Recommended.)" 10 64; then HTTPS_REDIRECT=1; else HTTPS_REDIRECT=0; fi
   if wt --defaultno --yesno "Open the CUPS web page (port 631) to your local network?\n\n(Off by default. Handy for adding printers.)" 10 64; then CUPS_WEB=1; else CUPS_WEB=0; fi
   if wt --yesno "Turn on the firewall (ufw) inside the VM?\n\n(Recommended.)" 10 64; then SKIP_FIREWALL=0; else SKIP_FIREWALL=1; fi
+  if wt --yesno "Install all updates automatically every night?\n\nThe VM reboots afterwards only when an update needs it. (Recommended for a set-and-forget server.)" 11 66; then
+    AUTO_UPDATES=1
+    UPDATE_TIME=$(wt --inputbox "Time for the nightly updates (24-hour clock, e.g. 03:00)" 8 60 "$UPDATE_TIME") || cancelled
+  else
+    AUTO_UPDATES=0
+  fi
 
   wt --yesno "Create the VM with these settings?\n
   OS        : $var_os $var_version
@@ -127,7 +137,8 @@ settings_menu() {
   Disk      : $var_disk GB on $var_storage
   Network   : $var_bridge (DHCP)
   Login     : $var_user ($([[ -n "$var_password" ]] && echo "your password" || echo "random password"))
-  HTTPS redirect: $( ((HTTPS_REDIRECT)) && echo on || echo off ), CUPS web page: $( ((CUPS_WEB)) && echo on || echo off ), firewall: $( ((SKIP_FIREWALL)) && echo off || echo on )" 20 66 || cancelled
+  HTTPS redirect: $( ((HTTPS_REDIRECT)) && echo on || echo off ), CUPS web page: $( ((CUPS_WEB)) && echo on || echo off ), firewall: $( ((SKIP_FIREWALL)) && echo off || echo on )
+  Updates   : $( ((AUTO_UPDATES)) && echo "every night at $UPDATE_TIME" || echo off )" 21 66 || cancelled
 }
 
 if (( SHOW_MENU )) && [[ -t 0 && -t 1 ]] && command -v whiptail >/dev/null; then
@@ -168,6 +179,7 @@ else
   var_user="${var_user:-admin}"
 fi
 
+[[ "$UPDATE_TIME" =~ ^([01][0-9]|2[0-3]):[0-5][0-9]$ ]] || die "UPDATE_TIME='$UPDATE_TIME' is not a time like 03:00 (24-hour clock)."
 [[ "$var_user" =~ ^[a-z_][a-z0-9_-]{0,31}$ ]] || die "var_user='$var_user' is not a valid Linux user name."
 [[ "$var_user" != savapage && "$var_user" != root ]] || die "var_user can't be '$var_user'. SavaPage needs 'savapage' for itself. Pick another name."
 [[ "$var_hostname" =~ ^[a-zA-Z0-9][a-zA-Z0-9-]{0,62}$ ]] || die "var_hostname='$var_hostname' is not a valid host name."
@@ -234,6 +246,7 @@ cat <<EOF
    Network   : $var_bridge (DHCP)
    Login     : $var_user
    Options   : HTTPS_REDIRECT=$HTTPS_REDIRECT CUPS_WEB=$CUPS_WEB SKIP_FIREWALL=$SKIP_FIREWALL
+   Updates   : $( [[ "$AUTO_UPDATES" == 1 ]] && echo "all updates every night at $UPDATE_TIME" || echo off )
 EOF
 
 # ---------------------------------------------------------------------------
@@ -279,7 +292,7 @@ write_files:
       rm -rf $HOME_DIR/savapage-easy-install
       git clone $REPO_URL $HOME_DIR/savapage-easy-install || { echo 90 > /var/log/savapage-install.exit; exit 1; }
       chown -R $var_user: $HOME_DIR/savapage-easy-install
-      HTTPS_REDIRECT=$HTTPS_REDIRECT CUPS_WEB=$CUPS_WEB SKIP_FIREWALL=$SKIP_FIREWALL bash $HOME_DIR/savapage-easy-install/install-savapage.sh
+      HTTPS_REDIRECT=$HTTPS_REDIRECT CUPS_WEB=$CUPS_WEB SKIP_FIREWALL=$SKIP_FIREWALL AUTO_UPDATES=$AUTO_UPDATES UPDATE_TIME=$UPDATE_TIME bash $HOME_DIR/savapage-easy-install/install-savapage.sh
       rc=\$?
       if [ "\$rc" -eq 0 ] && [ "$CUPS_WEB" = 1 ]; then usermod -aG lpadmin $var_user; fi
       # Status screen on the console: what's running, the IP and the web addresses.

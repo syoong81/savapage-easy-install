@@ -13,7 +13,7 @@ A one-step install script for the [SavaPage](https://www.savapage.org/) print se
 - **print accounting and quotas** per user,
 - one shared print queue that phones, tablets and computers can use without installing drivers.
 
-Installing it by hand takes many steps: Java, CUPS, a system account, CUPS hardening, the installer, a root-only step, and the firewall. **`install-savapage.sh` does all of them for you.** It detects whether it's running on a normal machine or in an LXC container, and adjusts itself.
+Installing it by hand takes many steps: Java, CUPS, a system account, CUPS hardening, the installer, a root-only step, and the firewall. **`install-savapage.sh` does all of them for you,** and also sets the server to install updates by itself every night, so it stays patched. It detects whether it's running on a normal machine or in an LXC container, and adjusts itself.
 
 The setup isn't tied to any particular network, so you can set it up at one location and move it to another.
 
@@ -21,13 +21,13 @@ The setup isn't tied to any particular network, so you can set it up at one loca
 
 Everything is in **[INSTALL.md](INSTALL.md)**, one guide for both a **VM / physical machine** and a **Proxmox LXC container**.
 
-**Quickest, on Proxmox:** this creates a new VM with SavaPage installed. Run it in the **Proxmox host shell**. A menu lets you use the defaults or choose the settings, including **Debian or Ubuntu LTS**:
+**Quickest, on Proxmox:** this creates a new VM with SavaPage installed. Run it in the **Proxmox host shell**. It uses **Ubuntu 26.04 LTS** by default, for the longest support, and installs all updates **automatically every night**. A menu lets you use the defaults or choose the settings, including Debian instead:
 
 ```bash
 bash -c "$(curl -fsSL https://raw.githubusercontent.com/syoong81/savapage-easy-install/main/proxmox-vm.sh)"
 ```
 
-See [INSTALL.md](INSTALL.md#quickest-a-new-proxmox-vm-with-one-command) for its settings. Log in to the VM as `admin` (`ubuntu` on an Ubuntu VM, `var_os=ubuntu`) with the password it prints. To set a new one, run `qm guest passwd VMID admin` in the host shell (see [Logging in to the VM](INSTALL.md#logging-in-to-the-vm)).
+See [INSTALL.md](INSTALL.md#quickest-a-new-proxmox-vm-with-one-command) for its settings. Log in to the VM as `ubuntu` (`admin` on a Debian VM) with the password it prints. To set a new one, run `qm guest passwd VMID ubuntu` in the host shell (see [Logging in to the VM](INSTALL.md#logging-in-to-the-vm)).
 
 **Or as an LXC container,** which uses less memory. Also in the **Proxmox host shell**:
 

@@ -8,7 +8,7 @@ If you use Proxmox, this one command creates a new VM with SavaPage already inst
 bash -c "$(curl -fsSL https://raw.githubusercontent.com/syoong81/savapage-easy-install/main/proxmox-vm.sh)"
 ```
 
-**It opens a menu,** like the community-scripts: choose **Use the default settings**, or **Choose the settings** to pick the operating system (Debian 13, Debian 12 or **Ubuntu 26.04 LTS**), the VM ID, name, CPU, memory, disk, storage, network bridge, login user and password, and the install options. It shows everything once more before it creates the VM. Esc cancels without changing anything.
+**It opens a menu,** like the community-scripts: choose **Use the default settings**, or **Choose the settings** to pick the operating system (**Ubuntu 26.04 LTS**, the default, Debian 13 or Debian 12), the VM ID, name, CPU, memory, disk, storage, network bridge, login user and password, and the install options. It shows everything once more before it creates the VM. Esc cancels without changing anything.
 
 **Using the menu:**
 
@@ -24,7 +24,7 @@ To change a filled-in value, delete it with **Backspace** and type the new one. 
 
 With the default settings, it:
 
-1. **Downloads the official Debian 13 cloud image** and checks its SHA-512 checksum.
+1. **Downloads the official Ubuntu 26.04 LTS cloud image** and checks its SHA-256 checksum. Ubuntu LTS is the default because it's supported the longest; see [Ubuntu or Debian?](#ubuntu-or-debian).
 2. **Creates the VM:** next free ID, 2 cores, 2 GB RAM, 16 GB disk, DHCP on `vmbr0`, starts with the host.
 3. **Installs SavaPage on the VM's first boot** with this repo's installer.
 4. **Adds a status screen to the VM's console**, like the Home Assistant OS console: whether SavaPage and CUPS are running, the firewall, the IP address, the version and the web addresses. It refreshes every minute, so it follows the server to a new network.
@@ -36,31 +36,31 @@ Then continue at [step 4: Log in and change the password](#4-log-in-and-change-t
 
 ### Logging in to the VM
 
-For updates and maintenance, log in to the VM as **`admin`** on Debian or **`ubuntu`** on Ubuntu (or the user you chose in the menu or with `var_user`), on **Console** or with `ssh admin@VM-IP`. That user can use `sudo` without typing a password again, so give it a strong password. In the commands below, use `ubuntu` instead of `admin` on an Ubuntu VM.
+For maintenance, log in to the VM as **`ubuntu`** (on a Debian VM: **`admin`**), or the user you chose in the menu or with `var_user`. Use **Console** or `ssh ubuntu@VM-IP`. That user can use `sudo` without typing a password again, so give it a strong password. On a Debian VM, use `admin` instead of `ubuntu` in the commands below.
 
 There are three different logins. Don't mix them up:
 
 | Login | User | Password |
 |---|---|---|
-| **The VM** (console, SSH) | `admin` (Debian) or `ubuntu` (Ubuntu) | The random one `proxmox-vm.sh` printed, or your `var_password` |
+| **The VM** (console, SSH) | `ubuntu` (Debian: `admin`) | The random one `proxmox-vm.sh` printed, or your `var_password` |
 | **SavaPage's web admin** (`https://VM-IP:8632/admin`) | `admin` | `admin` until you change it (step 4). Separate from the VM's login. |
 | `savapage` | — | **Can't log in.** It's SavaPage's own service account, with no password. Leave it that way. |
 
 **Set or reset the VM password.** In the **Proxmox host shell** (node → **Shell**), replace `118` with your VM ID:
 
 ```bash
-qm guest passwd 118 admin
+qm guest passwd 118 ubuntu
 ```
 
 It asks for the new password twice. This works without knowing the old password, through the guest agent.
 
-**Change it from inside the VM,** when you're logged in as `admin`:
+**Change it from inside the VM,** when you're logged in:
 
 ```bash
 passwd
 ```
 
-**Install updates,** logged in as `admin`:
+**Updates install themselves every night at 03:00** (see [Automatic updates](#automatic-updates)). To install them right now, logged in:
 
 ```bash
 sudo apt update && sudo apt full-upgrade -y
@@ -76,14 +76,14 @@ var_ram=4096 CUPS_WEB=1 bash -c "$(curl -fsSL https://raw.githubusercontent.com/
 
 | Setting | Default | What it changes |
 |---|---|---|
-| `var_os` | `debian` | `debian` or `ubuntu` |
-| `var_version` | `13` | Debian `13` or `12`; Ubuntu `26.04` |
+| `var_os` | `ubuntu` | `ubuntu` or `debian` |
+| `var_version` | `26.04` (Debian: `13`) | Ubuntu `26.04`; Debian `13` or `12` |
 | `var_vmid` | next free ID | VM ID |
 | `var_hostname` | `savapage` | VM name and hostname |
 | `var_cpu` / `var_ram` / `var_disk` | `2` / `2048` / `16` | Cores, RAM in MB, disk in GB |
 | `var_storage` | `local-lvm`, or the first that fits | Storage for the VM disk |
 | `var_bridge` | `vmbr0` | Network bridge |
-| `var_user` | `admin` on Debian, `ubuntu` on Ubuntu | The VM login user (not `savapage`; not `admin` on Ubuntu, which already has an `admin` group) |
+| `var_user` | `ubuntu` (Debian: `admin`) | The VM login user (not `savapage`; not `admin` on Ubuntu, which already has an `admin` group) |
 | `var_password` | random | The VM login password |
 | `var_sshkey` | none | A public key file to allow for SSH |
 | `HTTPS_REDIRECT`, `CUPS_WEB`, `SKIP_FIREWALL` | | Passed on to the installer. See [Install options](#install-options). |
@@ -92,7 +92,7 @@ var_ram=4096 CUPS_WEB=1 bash -c "$(curl -fsSL https://raw.githubusercontent.com/
 
 - **Console** in the web UI shows the VM's screen, with the status screen and the login prompt, like the Home Assistant OS console. It doesn't support copy and paste. For that, use **Console ▾ → xterm.js**, the VM's serial console, and press **Enter** to show the login prompt.
 - The **status screen** shows above the login prompt and again after you log in. While you're logged in on the console, the screen is your session, so the status screen doesn't come back on its own. **Type `exit` to log out and return to the status screen.** Show it any time with `savapage-status`. To remove it: `sudo bash ~/savapage-easy-install/savapage-status.sh --remove`. To add it to a machine you installed by hand: `sudo bash ~/savapage-easy-install/savapage-status.sh --install`.
-- SSH logins with the VM password are allowed: `ssh admin@VM-IP`.
+- SSH logins with the VM password are allowed: `ssh ubuntu@VM-IP`.
 - The VM's first-boot settings are saved as a Proxmox *snippet*, e.g. `/var/lib/vz/snippets/savapage-122.yaml`. Proxmox needs that file to start the VM, so keep it. It contains no passwords. If no storage allows snippets, the script turns them on for `local`.
 - To remove the VM later: **VM → More → Remove**. Then delete its snippet file.
 
@@ -209,7 +209,7 @@ Type or paste each command and press **Enter**. When you type a password, **noth
 7. [Set up SavaPage](#7-set-up-savapage)
 8. [Print to SavaPage from devices](#8-print-to-savapage-from-devices)
 
-Reference: [One-command Proxmox VM](#quickest-a-new-proxmox-vm-with-one-command) · [Install options](#install-options) · [CUPS web page](#cups-web-page) · [HTTPS redirect](#https-redirect) · [Updating the scripts](#updating-the-scripts) · [What the script changes](#what-the-script-changes) · [Moving the server](#moving-the-server-to-another-location) · [Everyday commands](#everyday-commands) · [Security](#security) · [Troubleshooting](#troubleshooting) · [Uninstall](#uninstall)
+Reference: [One-command Proxmox VM](#quickest-a-new-proxmox-vm-with-one-command) · [Install options](#install-options) · [Automatic updates](#automatic-updates) · [CUPS web page](#cups-web-page) · [HTTPS redirect](#https-redirect) · [Updating the scripts](#updating-the-scripts) · [What the script changes](#what-the-script-changes) · [Moving the server](#moving-the-server-to-another-location) · [Everyday commands](#everyday-commands) · [Security](#security) · [Troubleshooting](#troubleshooting) · [Uninstall](#uninstall)
 
 ---
 
@@ -538,7 +538,30 @@ HTTPS_REDIRECT=0 bash ~/savapage-easy-install/install-savapage.sh
 | `HTTPS_REDIRECT=0` | on | Don't send browsers on `http://…:8631` to HTTPS. See [HTTPS redirect](#https-redirect). |
 | `CUPS_WEB=1` | off | Open the CUPS web page (port 631) to your local network. See [CUPS web page](#cups-web-page). |
 | `SKIP_FIREWALL=1` | off | Don't touch the firewall. Use it if you manage the firewall yourself. |
+| `AUTO_UPDATES=0` | on | Don't install updates automatically. See [Automatic updates](#automatic-updates). |
+| `UPDATE_TIME=04:30` | `03:00` | When the nightly updates run (24-hour clock, server time). |
 | `SAVAPAGE_VERSION=…` | `1.7.0-final` | Install a different SavaPage release. |
+
+## Automatic updates
+
+**On by default,** for a server you can set up and forget. Every night the server installs **all** available updates, security fixes and normal ones, with the distribution's own tool, `unattended-upgrades`:
+
+- **02:30:** it refreshes the package lists (the same as `apt-get update`).
+- **03:00:** it installs the updates (like `apt-get upgrade`) and removes packages that are no longer needed.
+- **Only if an update needs it** (for example a new kernel), it **reboots** right after. SavaPage starts again by itself. Otherwise nothing restarts.
+- If the server was off at 03:00, it catches up the next time it starts.
+
+This doesn't update **SavaPage itself**. New SavaPage releases come from [savapage.org](https://www.savapage.org/).
+
+**Check it** (with `sudo` on a VM):
+
+| What | Command |
+|---|---|
+| When it runs next | `systemctl list-timers apt-daily-upgrade.timer` |
+| What it installed | `cat /var/log/unattended-upgrades/unattended-upgrades.log` |
+| Try it without installing anything | `unattended-upgrade --dry-run --debug` |
+
+**Change the time:** re-run the installer with, for example, `UPDATE_TIME=04:30`. **Turn it off:** re-run it with `AUTO_UPDATES=0`. The distribution's own default then stays: security updates only, at a random time.
 
 ## CUPS web page
 
@@ -680,6 +703,7 @@ This updates the scripts, not SavaPage itself. To upgrade SavaPage, see the [upg
 8. **Turns on the HTTPS redirect**, unless `HTTPS_REDIRECT=0`.
 9. **Turns on the `ufw` firewall** ([ports](#6-firewall)), in containers too. If a container can't run it, the script warns and carries on.
 10. **Keeps firewall messages off the console:** blocks LLMNR and SSDP chatter without logging, and writes `/etc/sysctl.d/10-console.conf` (not possible in an unprivileged container, so it warns instead).
+11. **Turns on automatic updates** ([details](#automatic-updates)): `/etc/apt/apt.conf.d/52savapage-auto-updates`, and fixed times for the `apt-daily` timers. Turn off with `AUTO_UPDATES=0`.
 
 You can safely run it again. It skips what's already done.
 
@@ -703,7 +727,7 @@ On a VM, put `sudo` in front of each command.
 | Is SavaPage running? | `systemctl status savapage` |
 | Restart SavaPage | `systemctl restart savapage` |
 | Firewall rules | `ufw status verbose` |
-| Install OS updates | `apt update && apt upgrade` |
+| Install OS updates now (they also install themselves nightly) | `apt update && apt upgrade` |
 | Change your login password | `passwd` |
 | Reset a VM's login password (on the **Proxmox host**) | `qm guest passwd VMID admin` |
 | Reset a container's root password (on the **Proxmox host**) | `pct enter CTID`, then `passwd`, then `exit` |
@@ -715,7 +739,7 @@ On a VM, put `sudo` in front of each command.
 - **Change the `admin` password** straight after installing.
 - **Never port-forward** 8631/8632 on your router. If you need outside access, use a VPN.
 - The firewall accepts SavaPage traffic from any address, so it relies on your router or network to keep outsiders out. On a shared or guest network, limit it to your own subnet, e.g. `sudo ufw allow from 192.168.1.0/24 to any port 8632`.
-- **Keep it updated:** OS updates regularly, and new SavaPage releases from [savapage.org](https://www.savapage.org/).
+- **Keep it updated:** OS updates install themselves every night ([Automatic updates](#automatic-updates)). Check for new SavaPage releases at [savapage.org](https://www.savapage.org/).
 - **Back up** `/opt/savapage/server/data/` regularly. The uninstall script makes one for you. Keep a separate copy of `encryption.properties`.
 
 ## Troubleshooting
