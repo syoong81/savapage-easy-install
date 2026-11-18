@@ -27,7 +27,7 @@ Everything is in **[INSTALL.md](INSTALL.md)**, one guide for both a **VM / physi
 bash -c "$(curl -fsSL https://raw.githubusercontent.com/syoong81/savapage-easy-install/main/proxmox-vm.sh)"
 ```
 
-See [INSTALL.md](INSTALL.md#quickest-a-new-proxmox-vm-with-one-command) for its settings. Log in to the VM as `admin` with the password it prints. To set a new one, run `qm guest passwd VMID admin` in the host shell (see [Logging in to the VM](INSTALL.md#logging-in-to-the-vm)).
+See [INSTALL.md](INSTALL.md#quickest-a-new-proxmox-vm-with-one-command) for its settings. Log in to the VM as `admin` (`ubuntu` on an Ubuntu VM, `var_os=ubuntu`) with the password it prints. To set a new one, run `qm guest passwd VMID admin` in the host shell (see [Logging in to the VM](INSTALL.md#logging-in-to-the-vm)).
 
 **Or as an LXC container,** which uses less memory. Also in the **Proxmox host shell**:
 

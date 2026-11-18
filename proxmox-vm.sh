@@ -22,7 +22,7 @@
 #   var_disk=16             Disk size in GB
 #   var_storage=local-lvm   Storage for the VM disk (default: local-lvm, or the first that fits)
 #   var_bridge=vmbr0        Network bridge
-#   var_user=admin          Login user for the VM (must not be 'savapage')
+#   var_user=admin          Login user for the VM (default: admin on Debian, ubuntu on Ubuntu)
 #   var_password=...        Password for that user (default: a random one, shown at the end)
 #   var_sshkey=/root/.ssh/id_ed25519.pub   Public key to allow for SSH logins (optional)
 #
@@ -42,7 +42,6 @@ var_cpu="${var_cpu:-2}"
 var_ram="${var_ram:-2048}"
 var_disk="${var_disk:-16}"
 var_bridge="${var_bridge:-vmbr0}"
-var_user="${var_user:-admin}"
 HTTPS_REDIRECT="${HTTPS_REDIRECT:-1}"
 CUPS_WEB="${CUPS_WEB:-0}"
 SKIP_FIREWALL="${SKIP_FIREWALL:-0}"
@@ -86,6 +85,15 @@ case "$var_os" in
     ;;
   *) die "var_os=$var_os is not supported. Use debian or ubuntu." ;;
 esac
+
+# Login user. Ubuntu's cloud image already has a group called 'admin', so cloud-init
+# can't create a user with that name there. Use Ubuntu's usual 'ubuntu' instead.
+if [[ "$var_os" == ubuntu ]]; then
+  var_user="${var_user:-ubuntu}"
+  [[ "$var_user" != admin ]] || die "var_user can't be 'admin' on Ubuntu: Ubuntu already has an 'admin' group. Leave var_user out to use 'ubuntu', or pick another name."
+else
+  var_user="${var_user:-admin}"
+fi
 
 [[ "$var_user" =~ ^[a-z_][a-z0-9_-]{0,31}$ ]] || die "var_user='$var_user' is not a valid Linux user name."
 [[ "$var_user" != savapage && "$var_user" != root ]] || die "var_user can't be '$var_user'. SavaPage needs 'savapage' for itself. Pick another name."

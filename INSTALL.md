@@ -22,13 +22,13 @@ Then continue at [step 4: Log in and change the password](#4-log-in-and-change-t
 
 ### Logging in to the VM
 
-For updates and maintenance, log in to the VM as **`admin`** (or the name you set with `var_user`), on **Console** or with `ssh admin@VM-IP`. `admin` can use `sudo` without typing a password again, so give it a strong password.
+For updates and maintenance, log in to the VM as **`admin`** on Debian or **`ubuntu`** on Ubuntu (or the name you set with `var_user`), on **Console** or with `ssh admin@VM-IP`. That user can use `sudo` without typing a password again, so give it a strong password. In the commands below, use `ubuntu` instead of `admin` on an Ubuntu VM.
 
 There are three different logins. Don't mix them up:
 
 | Login | User | Password |
 |---|---|---|
-| **The VM** (console, SSH) | `admin` | The random one `proxmox-vm.sh` printed, or your `var_password` |
+| **The VM** (console, SSH) | `admin` (Debian) or `ubuntu` (Ubuntu) | The random one `proxmox-vm.sh` printed, or your `var_password` |
 | **SavaPage's web admin** (`https://VM-IP:8632/admin`) | `admin` | `admin` until you change it (step 4). Separate from the VM's login. |
 | `savapage` | — | **Can't log in.** It's SavaPage's own service account, with no password. Leave it that way. |
 
@@ -67,7 +67,7 @@ var_ram=4096 CUPS_WEB=1 bash -c "$(curl -fsSL https://raw.githubusercontent.com/
 | `var_cpu` / `var_ram` / `var_disk` | `2` / `2048` / `16` | Cores, RAM in MB, disk in GB |
 | `var_storage` | `local-lvm`, or the first that fits | Storage for the VM disk |
 | `var_bridge` | `vmbr0` | Network bridge |
-| `var_user` | `admin` | The VM login user (not `savapage`) |
+| `var_user` | `admin` on Debian, `ubuntu` on Ubuntu | The VM login user (not `savapage`; not `admin` on Ubuntu, which already has an `admin` group) |
 | `var_password` | random | The VM login password |
 | `var_sshkey` | none | A public key file to allow for SSH |
 | `HTTPS_REDIRECT`, `CUPS_WEB`, `SKIP_FIREWALL` | | Passed on to the installer. See [Install options](#install-options). |
