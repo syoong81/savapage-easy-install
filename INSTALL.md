@@ -13,7 +13,8 @@ It:
 1. **Downloads the official Debian 13 cloud image** and checks its SHA-512 checksum.
 2. **Creates the VM:** next free ID, 2 cores, 2 GB RAM, 16 GB disk, DHCP on `vmbr0`, starts with the host.
 3. **Installs SavaPage on the VM's first boot** with this repo's installer.
-4. **Prints the VM's IP, the admin address and the VM login** when it's done, after about 3–15 minutes.
+4. **Adds a status screen to the VM's console**, like the Home Assistant OS console: whether SavaPage and CUPS are running, the firewall, the IP address, the version and the web addresses. It refreshes every minute, so it follows the server to a new network.
+5. **Prints the VM's IP, the admin address and the VM login** when it's done, after about 3–15 minutes.
 
 **Save the VM password** it shows. It's random and shown twice: before the wait and at the end. If you lose it, run `qm guest passwd VMID admin` in the host shell to set a new one.
 
@@ -42,6 +43,7 @@ var_ram=4096 CUPS_WEB=1 bash -c "$(curl -fsSL https://raw.githubusercontent.com/
 **Good to know:**
 
 - The VM uses Proxmox's **serial console**, so **Console** in the web UI supports copy and paste.
+- The **status screen** shows above the login prompt and again after you log in. Show it any time with `savapage-status`. To remove it: `sudo bash ~/savapage-easy-install/savapage-status.sh --remove`. To add it to a machine you installed by hand: `sudo bash ~/savapage-easy-install/savapage-status.sh --install`.
 - SSH logins with the VM password are allowed: `ssh admin@VM-IP`.
 - The VM's first-boot settings are saved as a Proxmox *snippet*, e.g. `/var/lib/vz/snippets/savapage-122.yaml`. Proxmox needs that file to start the VM, so keep it. It contains no passwords. If no storage allows snippets, the script turns them on for `local`.
 - To remove the VM later: **VM → More → Remove**. Then delete its snippet file.
@@ -267,8 +269,19 @@ Nothing to do, on a VM, a physical machine or an LXC container. The script turns
 | TCP 8632 | SavaPage HTTPS |
 | TCP 9100 | RAW printing |
 | UDP 5353 | Printer discovery (AirPrint) |
+| UDP 10001 | Ubiquiti device discovery |
 
-CUPS (631) stays blocked, unless you turn on the [CUPS web page](#cups-web-page). Check the firewall at any time.
+CUPS (631) stays blocked, unless you turn on the [CUPS web page](#cups-web-page).
+
+Two kinds of network chatter, LLMNR from Windows PCs (UDP 5355) and SSDP/UPnP (UDP 1900), are **blocked quietly**: the firewall drops them without logging. Without this, the console fills with `[UFW BLOCK]` lines that bury the login prompt.
+
+The script also keeps kernel messages off the console (`kernel.printk = 3 4 1 3` in `/etc/sysctl.d/10-console.conf`). They still go to the system log: see them with `journalctl -k`. An unprivileged LXC container can't change this setting. The script then shows a warning, and you can set it on the Proxmox host instead, in the host shell:
+
+```bash
+echo 'kernel.printk = 3 4 1 3' > /etc/sysctl.d/10-console.conf && sysctl -p /etc/sysctl.d/10-console.conf
+```
+
+Check the firewall at any time.
 
 **VM / physical machine:**
 
@@ -540,6 +553,7 @@ This updates the scripts, not SavaPage itself. To upgrade SavaPage, see the [upg
 7. **Runs the SavaPage installer**, then its root step (`MUST-RUN-AS-ROOT`), which installs the `savapage` service.
 8. **Turns on the HTTPS redirect**, unless `HTTPS_REDIRECT=0`.
 9. **Turns on the `ufw` firewall** ([ports](#6-firewall)), in containers too. If a container can't run it, the script warns and carries on.
+10. **Keeps firewall messages off the console:** blocks LLMNR and SSDP chatter without logging, and writes `/etc/sysctl.d/10-console.conf` (not possible in an unprivileged container, so it warns instead).
 
 You can safely run it again. It skips what's already done.
 
@@ -634,6 +648,6 @@ When everything says PASS, you can [reinstall](#3-run-the-installer) at any time
 | `ASSUME_YES=1` | Don't ask for confirmation. |
 | `SKIP_BACKUP=1` | Don't make the backup. |
 | `RESTORE_CUPS=1` | Put back the CUPS config from before SavaPage. |
-| `REMOVE_FIREWALL_RULES=1` | Remove the firewall rules for 8631, 8632, 9100, 5353 and 631 (if opened). The SSH rule and the firewall stay. |
+| `REMOVE_FIREWALL_RULES=1` | Remove the firewall rules for 8631, 8632, 9100, 5353, 10001 and 631 (if opened), the quiet blocks, and `/etc/sysctl.d/10-console.conf`. The SSH rule and the firewall stay. |
 
 **LXC container, the quick way:** delete the whole container (**More → Remove**). Back up `encryption.properties` first.

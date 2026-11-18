@@ -58,6 +58,7 @@ The machine must be 64-bit Intel/AMD (x86_64). Raspberry Pi / ARM is not support
 |---|---|
 | `install-savapage.sh` | The install script |
 | `proxmox-vm.sh` | Run on a Proxmox host: creates a new VM with SavaPage installed, in one command |
+| `savapage-status.sh` | The console status screen (`proxmox-vm.sh` adds it): what's running, the IP and the web addresses |
 | `uninstall-savapage.sh` | The uninstall script. It backs up your data, removes SavaPage and checks the machine is clean for a reinstall. |
 | `INSTALL.md` | Step-by-step install guide for a VM / physical machine and a Proxmox LXC container |
 | `LICENSE` | MIT License for these scripts and guides |

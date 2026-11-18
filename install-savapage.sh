@@ -30,7 +30,8 @@ CUPS_WEB="${CUPS_WEB:-0}"
 
 # Ports SavaPage needs (see manual, "Check Firewall Settings").
 OPEN_TCP_PORTS="22 8631 8632 9100"   # SSH, HTTP, HTTPS, JetDirect/RAW printing
-OPEN_UDP_PORTS="5353"                # mDNS for IPP Everywhere / AirPrint discovery
+OPEN_UDP_PORTS="5353 10001"          # mDNS for IPP Everywhere / AirPrint discovery, Ubiquiti discovery
+QUIET_DENY_UDP_PORTS="5355 1900"     # LAN chatter blocked without logging: LLMNR, SSDP
 
 log()  { printf '\n\033[1;34m==> %s\033[0m\n' "$*"; }
 warn() { printf '\033[1;33m[!] %s\033[0m\n' "$*" >&2; }
@@ -298,8 +299,25 @@ configure_ufw() {
     ufw allow "$p/tcp" comment "$label" >/dev/null || return 1
   done
   for p in $OPEN_UDP_PORTS; do
-    ufw allow "$p/udp" comment 'mDNS' >/dev/null || return 1
+    case "$p" in
+      5353)  label='mDNS' ;;
+      10001) label='Ubiquiti discovery' ;;
+      *)     label='SavaPage' ;;
+    esac
+    ufw allow "$p/udp" comment "$label" >/dev/null || return 1
   done
+  # Block common network chatter with explicit rules. Explicit rules aren't logged,
+  # so these packets don't fill the console and logs with [UFW BLOCK] lines.
+  # (mDNS, 5353/udp, and Ubiquiti discovery, 10001/udp, are allowed above instead.)
+  for p in $QUIET_DENY_UDP_PORTS; do
+    case "$p" in
+      5355)  label='LLMNR (Windows), blocked quietly' ;;
+      1900)  label='SSDP/UPnP, blocked quietly' ;;
+      *)    label='blocked quietly' ;;
+    esac
+    ufw deny "$p/udp" comment "$label" >/dev/null || return 1
+  done
+  ufw logging low >/dev/null || return 1
   # CUPS (631) stays closed unless CUPS_WEB=1. Close it again if it was opened before.
   # SavaPage's local SSL port (8633) is never opened.
   if [[ "$CUPS_WEB" != "1" ]]; then
@@ -307,6 +325,25 @@ configure_ufw() {
   fi
   ufw --force enable >/dev/null || return 1
   ufw status | grep -q '^Status: active'
+}
+
+# Kernel messages, such as [UFW BLOCK] lines, are printed on the console and can bury
+# the login prompt. Keep them in the journal/syslog only (journalctl -k still shows them).
+CONSOLE_CONF=/etc/sysctl.d/10-console.conf
+PRINTK_SETTING='kernel.printk = 3 4 1 3'
+PRINTK_FAILED=0
+quiet_console() {
+  if sysctl -q -w kernel.printk="3 4 1 3" >/dev/null 2>&1; then
+    echo "$PRINTK_SETTING" > "$CONSOLE_CONF"
+    echo "Kernel messages now go to the system log, not the console ($CONSOLE_CONF)."
+  else
+    # An unprivileged container can't change this kernel setting. Only the host can.
+    PRINTK_FAILED=1
+    rm -f "$CONSOLE_CONF"
+    warn "Could not keep kernel messages off the console (normal in an unprivileged container)."
+    warn "If [UFW BLOCK] lines flood the console, run this in the Proxmox host shell:"
+    warn "  echo '$PRINTK_SETTING' > $CONSOLE_CONF && sysctl -p $CONSOLE_CONF"
+  fi
 }
 
 if [[ "${SKIP_FIREWALL:-0}" == "1" ]]; then
@@ -319,7 +356,8 @@ else
   apt-get install -y -q ufw
 
   if configure_ufw; then
-    ufw status verbose
+    UFW_ACTIVE=1
+    quiet_console
   elif (( IN_LXC )); then
     # Some container setups can't run a firewall. Carry on without one.
     ufw --force disable >/dev/null 2>&1 || true
@@ -347,6 +385,10 @@ fi
 HOST_IP=$(ip route get 1.1.1.1 2>/dev/null | awk '{for (i = 1; i < NF; i++) if ($i == "src") {print $(i + 1); exit}}')
 HOST_IP=${HOST_IP:-SERVER-IP}
 HOSTNAME_LOCAL="$(hostname -s).local"
+if [[ "${UFW_ACTIVE:-0}" == "1" ]]; then
+  log "Firewall rules"
+  ufw status verbose
+fi
 cat <<EOF
 
 ========================================================================
@@ -372,3 +414,7 @@ cat <<EOF
  Next steps    : see INSTALL.md.
 ========================================================================
 EOF
+if (( PRINTK_FAILED )); then
+  warn "Kernel messages may still appear on the console. To stop them, run this in the Proxmox host shell:"
+  warn "  echo '$PRINTK_SETTING' > $CONSOLE_CONF && sysctl -p $CONSOLE_CONF"
+fi

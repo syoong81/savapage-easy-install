@@ -9,7 +9,8 @@
 #
 # It downloads an official Debian (or Ubuntu) cloud image, verifies its checksum,
 # creates a VM with cloud-init, and installs SavaPage on the VM's first boot with
-# install-savapage.sh from this repository.
+# install-savapage.sh from this repository. It also adds a status screen to the VM's
+# console (savapage-status.sh): what's running, the IP address and the web addresses.
 #
 # Optional settings (put them in front of 'bash'):
 #   var_os=debian           debian (default) or ubuntu
@@ -200,6 +201,8 @@ write_files:
       HTTPS_REDIRECT=$HTTPS_REDIRECT CUPS_WEB=$CUPS_WEB SKIP_FIREWALL=$SKIP_FIREWALL bash $HOME_DIR/savapage-easy-install/install-savapage.sh
       rc=\$?
       if [ "\$rc" -eq 0 ] && [ "$CUPS_WEB" = 1 ]; then usermod -aG lpadmin $var_user; fi
+      # Status screen on the console: what's running, the IP and the web addresses.
+      if [ "\$rc" -eq 0 ]; then bash $HOME_DIR/savapage-easy-install/savapage-status.sh --install; fi
       echo "\$rc" > /var/log/savapage-install.exit
 runcmd:
   - [systemctl, start, qemu-guest-agent]
@@ -295,6 +298,7 @@ fi
 cat <<EOF
  SSH           : ssh $var_user@$VM_IP
  Console       : VM $var_vmid > Console in the Proxmox web UI
+                 (shows the SavaPage status; run 'savapage-status' any time)
  Lost password : on the Proxmox host, run: qm guest passwd $var_vmid $var_user
 
  Scripts in the VM: ~/savapage-easy-install/ (for re-runs and uninstall)

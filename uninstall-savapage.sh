@@ -10,7 +10,8 @@
 #   ASSUME_YES=1             Don't ask for confirmation (needed with 'pct exec')
 #   SKIP_BACKUP=1            Don't back up /opt/savapage/server/data first
 #   RESTORE_CUPS=1           Restore /etc/cups/cupsd.conf from the installer's backup
-#   REMOVE_FIREWALL_RULES=1  Remove the ufw rules for ports 8631, 8632, 9100, 5353 (and 631 if opened)
+#   REMOVE_FIREWALL_RULES=1  Remove the ufw rules for ports 8631, 8632, 9100, 5353, 10001 (and 631 if opened),
+#                            the quiet blocks (5355, 1900) and /etc/sysctl.d/10-console.conf
 #                            (the SSH rule and ufw itself are left alone)
 #
 # Example:
@@ -98,6 +99,10 @@ if (( ! NOTHING_INSTALLED )); then
   systemctl daemon-reload
 
   rm -f /etc/pam.d/savapage
+  # The console status screen (savapage-status.sh --install), if it was added.
+  if [[ -x /usr/local/bin/savapage-status ]]; then
+    /usr/local/bin/savapage-status --remove >/dev/null 2>&1 || true
+  fi
   cd /
   rm -rf "$INSTALL_DIR"
 
@@ -135,8 +140,14 @@ if [[ "${REMOVE_FIREWALL_RULES:-0}" == "1" ]]; then
     for p in $SAVAPAGE_PORTS; do ufw delete allow "$p/tcp" >/dev/null 2>&1 || true; done
     ufw delete allow 5353/udp >/dev/null 2>&1 || true
     ufw delete allow 631/tcp >/dev/null 2>&1 || true   # CUPS web interface (CUPS_WEB=1)
+    ufw delete allow 10001/udp >/dev/null 2>&1 || true  # Ubiquiti discovery
+    for p in 5355 1900; do ufw delete deny "$p/udp" >/dev/null 2>&1 || true; done  # quiet blocks
   else
     warn "ufw is not installed. No firewall rules to remove."
+  fi
+  # The console setting goes with the firewall. Remove it only if it is exactly ours.
+  if grep -qx 'kernel.printk = 3 4 1 3' /etc/sysctl.d/10-console.conf 2>/dev/null; then
+    rm -f /etc/sysctl.d/10-console.conf   # the kernel default comes back at the next boot
   fi
 fi
 
