@@ -12,7 +12,11 @@
 # install-savapage.sh from this repository. It also adds a status screen to the VM's
 # console (savapage-status.sh): what's running, the IP address and the web addresses.
 #
-# Optional settings (put them in front of 'bash'):
+# With no settings, it shows a menu (like community-scripts): use the defaults, or
+# choose the OS, size, network, login and install options.
+#
+# Optional settings (put them in front of 'bash'; any of them skips the menu):
+#   var_menu=1              Show the menu anyway (var_menu=0: never show it)
 #   var_os=debian           debian (default) or ubuntu
 #   var_version=13          Debian: 13 (default) or 12. Ubuntu: 26.04 (default)
 #   var_vmid=120            VM ID (default: next free ID)
@@ -35,6 +39,14 @@
 set -euo pipefail
 
 REPO_URL="https://github.com/syoong81/savapage-easy-install.git"
+
+# Show the menu only when no settings were given on the command line.
+SHOW_MENU=1
+for v in var_os var_version var_vmid var_hostname var_cpu var_ram var_disk var_storage \
+         var_bridge var_user var_password var_sshkey HTTPS_REDIRECT CUPS_WEB SKIP_FIREWALL; do
+  [[ -n "${!v:-}" ]] && SHOW_MENU=0
+done
+case "${var_menu:-}" in 0) SHOW_MENU=0 ;; 1) SHOW_MENU=1 ;; esac
 
 var_os="${var_os:-debian}"
 var_hostname="${var_hostname:-savapage}"
@@ -60,6 +72,67 @@ for cmd in qm pvesh pvesm; do
   command -v "$cmd" >/dev/null || die "'$cmd' not found. Run this on the Proxmox host (Node > Shell), not inside a VM."
 done
 command -v curl >/dev/null || die "curl is required."
+
+# ---------------------------------------------------------------------------
+# Settings menu (whiptail, like community-scripts)
+# ---------------------------------------------------------------------------
+wt() { whiptail --backtitle "savapage-easy-install" --title "SavaPage VM" "$@" 3>&1 1>&2 2>&3; }
+cancelled() { clear; echo "Cancelled. Nothing was changed."; exit 0; }
+pick_from() {  # pick_from "question" item... : a menu of items, or the only item
+  local question=$1; shift
+  if (( $# == 1 )); then echo "$1"; return 0; fi
+  local items=() i
+  for i in "$@"; do items+=("$i" ""); done
+  wt --menu "$question" 16 60 6 "${items[@]}"
+}
+
+settings_menu() {
+  local choice os default_user
+  choice=$(wt --menu "Create a new Proxmox VM with SavaPage installed.\n\nDefault settings: Debian 13, 2 cores, 2 GB RAM, 16 GB disk, DHCP on vmbr0, HTTPS redirect on, firewall on, login user 'admin' with a random password." 17 72 2 \
+    default  "Use the default settings" \
+    advanced "Choose the settings") || cancelled
+  [[ "$choice" == advanced ]] || return 0
+
+  os=$(wt --radiolist "Operating system (Space to select, Enter to continue)" 12 66 3 \
+    debian-13    "Debian 13 (trixie)" ON \
+    debian-12    "Debian 12 (bookworm)" OFF \
+    ubuntu-26.04 "Ubuntu 26.04 LTS (longest support)" OFF) || cancelled
+  var_os=${os%%-*}; var_version=${os#*-}
+
+  var_vmid=$(wt --inputbox "VM ID" 8 60 "$(pvesh get /cluster/nextid)") || cancelled
+  var_hostname=$(wt --inputbox "VM name (also its hostname)" 8 60 "$var_hostname") || cancelled
+  var_cpu=$(wt --inputbox "CPU cores" 8 60 "$var_cpu") || cancelled
+  var_ram=$(wt --inputbox "Memory in MB (SavaPage recommends at least 2048)" 8 60 "$var_ram") || cancelled
+  var_disk=$(wt --inputbox "Disk size in GB" 8 60 "$var_disk") || cancelled
+  # shellcheck disable=SC2046
+  var_storage=$(pick_from "Storage for the VM disk" \
+    $(pvesm status -content images 2>/dev/null | awk 'NR > 1 && $3 == "active" {print $1}')) || cancelled
+  # shellcheck disable=SC2046
+  var_bridge=$(pick_from "Network bridge" \
+    $(ip -o link show type bridge | awk -F': ' '{print $2}' | sed 's/@.*//' | grep -v '^fwbr')) || cancelled
+
+  default_user=admin; [[ "$var_os" == ubuntu ]] && default_user=ubuntu
+  var_user=$(wt --inputbox "Login user for the VM" 8 60 "$default_user") || cancelled
+  var_password=$(wt --passwordbox "Password for '$var_user'.\n\nLeave it empty for a random one, shown at the end." 11 60) || cancelled
+
+  if wt --yesno "Send browsers on http://...:8631 to the secure HTTPS address?\n\n(Recommended.)" 10 64; then HTTPS_REDIRECT=1; else HTTPS_REDIRECT=0; fi
+  if wt --defaultno --yesno "Open the CUPS web page (port 631) to your local network?\n\n(Off by default. Handy for adding printers.)" 10 64; then CUPS_WEB=1; else CUPS_WEB=0; fi
+  if wt --yesno "Turn on the firewall (ufw) inside the VM?\n\n(Recommended.)" 10 64; then SKIP_FIREWALL=0; else SKIP_FIREWALL=1; fi
+
+  wt --yesno "Create the VM with these settings?\n
+  OS        : $var_os $var_version
+  VM ID     : $var_vmid
+  Name      : $var_hostname
+  CPU / RAM : $var_cpu cores / $var_ram MB
+  Disk      : $var_disk GB on $var_storage
+  Network   : $var_bridge (DHCP)
+  Login     : $var_user ($([[ -n "$var_password" ]] && echo "your password" || echo "random password"))
+  HTTPS redirect: $( ((HTTPS_REDIRECT)) && echo on || echo off ), CUPS web page: $( ((CUPS_WEB)) && echo on || echo off ), firewall: $( ((SKIP_FIREWALL)) && echo off || echo on )" 20 66 || cancelled
+}
+
+if (( SHOW_MENU )) && [[ -t 0 && -t 1 ]] && command -v whiptail >/dev/null; then
+  settings_menu
+fi
 
 case "$var_os" in
   debian)

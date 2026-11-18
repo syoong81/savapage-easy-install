@@ -21,7 +21,7 @@ The setup isn't tied to any particular network, so you can set it up at one loca
 
 Everything is in **[INSTALL.md](INSTALL.md)**, one guide for both a **VM / physical machine** and a **Proxmox LXC container**.
 
-**Quickest, on Proxmox:** this creates a new VM with SavaPage installed. Run it in the **Proxmox host shell**:
+**Quickest, on Proxmox:** this creates a new VM with SavaPage installed. Run it in the **Proxmox host shell**. A menu lets you use the defaults or choose the settings, including **Debian or Ubuntu LTS**:
 
 ```bash
 bash -c "$(curl -fsSL https://raw.githubusercontent.com/syoong81/savapage-easy-install/main/proxmox-vm.sh)"

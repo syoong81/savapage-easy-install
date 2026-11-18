@@ -8,7 +8,9 @@ If you use Proxmox, this one command creates a new VM with SavaPage already inst
 bash -c "$(curl -fsSL https://raw.githubusercontent.com/syoong81/savapage-easy-install/main/proxmox-vm.sh)"
 ```
 
-It:
+**It opens a menu,** like the community-scripts: choose **Use the default settings**, or **Choose the settings** to pick the operating system (Debian 13, Debian 12 or **Ubuntu 26.04 LTS**), the VM ID, name, CPU, memory, disk, storage, network bridge, login user and password, and the install options. It shows everything once more before it creates the VM. Esc cancels without changing anything.
+
+With the default settings, it:
 
 1. **Downloads the official Debian 13 cloud image** and checks its SHA-512 checksum.
 2. **Creates the VM:** next free ID, 2 cores, 2 GB RAM, 16 GB disk, DHCP on `vmbr0`, starts with the host.
@@ -52,7 +54,7 @@ passwd
 sudo apt update && sudo apt full-upgrade -y
 ```
 
-**Settings.** Put them in front of `bash`, e.g.:
+**Settings without the menu.** Put them in front of `bash`. Any setting skips the menu (add `var_menu=1` to show it anyway). For example:
 
 ```bash
 var_ram=4096 CUPS_WEB=1 bash -c "$(curl -fsSL https://raw.githubusercontent.com/syoong81/savapage-easy-install/main/proxmox-vm.sh)"
@@ -90,7 +92,9 @@ This creates a new **LXC container** with SavaPage already installed. A containe
 bash -c "$(curl -fsSL https://raw.githubusercontent.com/syoong81/savapage-easy-install/main/proxmox-lxc.sh)"
 ```
 
-It:
+**It opens the same kind of menu:** **Use the default settings**, or **Choose the settings** (operating system, container ID, name, CPU, memory, swap, disk, storage, network bridge, root password and install options).
+
+With the default settings, it:
 
 1. **Downloads the official Debian 13 container template** with Proxmox's own template tool (`pveam`), which checks the template's checksum.
 2. **Creates the container:** next free ID, unprivileged, **nesting** turned on, 2 cores, 2 GB RAM, 8 GB disk, DHCP on `vmbr0`, starts with the host.
@@ -100,7 +104,7 @@ It:
 
 Then continue at [step 4: Log in and change the password](#4-log-in-and-change-the-password). Inside the container, the scripts are in `/root/savapage-easy-install/`.
 
-**Settings.** Put them in front of `bash`, e.g. `var_ram=4096 bash -c "$(curl …)"`:
+**Settings without the menu.** Put them in front of `bash`, e.g. `var_ram=4096 bash -c "$(curl …)"`. Any setting skips the menu:
 
 | Setting | Default | What it changes |
 |---|---|---|
