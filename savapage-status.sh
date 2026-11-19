@@ -57,7 +57,7 @@ collect() {
   if grep -qs '^ENABLED=yes' /etc/ufw/ufw.conf; then FIREWALL=on; else FIREWALL=off; fi
 
   if /usr/sbin/cupsctl 2>/dev/null | grep -q '^_remote_admin=1'; then
-    CUPS_WEB="on (http://$IP:631)"
+    CUPS_WEB="on: https://$IP:631/admin"
   else
     CUPS_WEB="off"
   fi
