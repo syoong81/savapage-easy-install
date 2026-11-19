@@ -31,7 +31,7 @@
 #   var_sshkey=/root/.ssh/id_ed25519.pub   Public key to allow for SSH logins (optional)
 #
 # Install options passed on to install-savapage.sh:
-#   HTTPS_REDIRECT=0  CUPS_WEB=1  SKIP_FIREWALL=1
+#   HTTPS_REDIRECT=0  CUPS_WEB=0  SKIP_FIREWALL=1   (CUPS_WEB=0: keep the CUPS page closed)
 #   AUTO_UPDATES=0    UPDATE_TIME=03:00   (default: all updates every night at 03:00)
 #
 # Example:
@@ -57,7 +57,7 @@ var_ram="${var_ram:-2048}"
 var_disk="${var_disk:-16}"
 var_bridge="${var_bridge:-vmbr0}"
 HTTPS_REDIRECT="${HTTPS_REDIRECT:-1}"
-CUPS_WEB="${CUPS_WEB:-0}"
+CUPS_WEB="${CUPS_WEB:-1}"   # the CUPS web page, for adding printers
 SKIP_FIREWALL="${SKIP_FIREWALL:-0}"
 AUTO_UPDATES="${AUTO_UPDATES:-1}"
 UPDATE_TIME="${UPDATE_TIME:-03:00}"
@@ -92,7 +92,7 @@ pick_from() {  # pick_from "question" item... : a menu of items, or the only ite
 
 settings_menu() {
   local choice os default_user
-  choice=$(wt --menu "Create a new Proxmox VM with SavaPage installed.\n\nDefault settings: Ubuntu 26.04 LTS, 2 cores, 2 GB RAM, 16 GB disk, DHCP on vmbr0, HTTPS redirect on, firewall on, all updates installed every night at 03:00, login user 'ubuntu' with a random password." 18 72 2 \
+  choice=$(wt --menu "Create a new Proxmox VM with SavaPage installed.\n\nDefault settings: Ubuntu 26.04 LTS, 2 cores, 2 GB RAM, 16 GB disk, DHCP on vmbr0, HTTPS redirect on, CUPS web page on (to add printers), firewall on, all updates installed every night at 03:00, login user 'ubuntu' with a random password." 19 72 2 \
     default  "Use the default settings" \
     advanced "Choose the settings") || cancelled
   [[ "$choice" == advanced ]] || return 0
@@ -120,7 +120,7 @@ settings_menu() {
   var_password=$(wt --passwordbox "Password for '$var_user'.\n\nLeave it empty for a random one, shown at the end." 11 60) || cancelled
 
   if wt --yesno "Send browsers on http://...:8631 to the secure HTTPS address?\n\n(Recommended.)" 10 64; then HTTPS_REDIRECT=1; else HTTPS_REDIRECT=0; fi
-  if wt --defaultno --yesno "Open the CUPS web page (port 631) to your local network?\n\n(Off by default. Handy for adding printers.)" 10 64; then CUPS_WEB=1; else CUPS_WEB=0; fi
+  if wt --yesno "Open the CUPS web page (port 631) to your local network?\n\nYou add printers there. (Recommended. Close it later with: sudo savapage-cups off)" 11 66; then CUPS_WEB=1; else CUPS_WEB=0; fi
   if wt --yesno "Turn on the firewall (ufw) inside the VM?\n\n(Recommended.)" 10 64; then SKIP_FIREWALL=0; else SKIP_FIREWALL=1; fi
   if wt --yesno "Install all updates automatically every night?\n\nThe VM reboots afterwards only when an update needs it. (Recommended for a set-and-forget server.)" 11 66; then
     AUTO_UPDATES=1

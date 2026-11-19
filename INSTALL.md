@@ -396,8 +396,9 @@ Nothing to do, on a VM, a physical machine or an LXC container. The script turns
 | TCP 9100 | RAW printing |
 | UDP 5353 | Printer discovery (AirPrint) |
 | UDP 10001 | Ubiquiti device discovery |
+| TCP 631 | CUPS web page, to add printers (VM / physical machine; close with `sudo savapage-cups off`) |
 
-CUPS (631) stays blocked, unless you turn on the [CUPS web page](#cups-web-page).
+TCP 631, the [CUPS web page](#cups-web-page) for adding printers, is also open on a VM or physical machine (not in a container) until you close it with `sudo savapage-cups off`.
 
 Two kinds of network chatter, LLMNR from Windows PCs (UDP 5355) and SSDP/UPnP (UDP 1900), are **blocked quietly**: the firewall drops them without logging. Without this, the console fills with `[UFW BLOCK]` lines that bury the login prompt.
 
@@ -536,7 +537,7 @@ HTTPS_REDIRECT=0 bash ~/savapage-easy-install/install-savapage.sh
 | Option | Default | Effect |
 |---|---|---|
 | `HTTPS_REDIRECT=0` | on | Don't send browsers on `http://…:8631` to HTTPS. See [HTTPS redirect](#https-redirect). |
-| `CUPS_WEB=1` | off | Open the CUPS web page (port 631) to your local network. See [CUPS web page](#cups-web-page). |
+| `CUPS_WEB=0` | on (off in containers) | Keep the CUPS web page (port 631, for adding printers) closed. `CUPS_WEB=1` opens it. Later: `sudo savapage-cups on` / `off`. See [CUPS web page](#cups-web-page). |
 | `SKIP_FIREWALL=1` | off | Don't touch the firewall. Use it if you manage the firewall yourself. |
 | `AUTO_UPDATES=0` | on | Don't install updates automatically. See [Automatic updates](#automatic-updates). |
 | `UPDATE_TIME=04:30` | `03:00` | When the nightly updates run (24-hour clock, server time). |
@@ -566,51 +567,27 @@ This doesn't update **SavaPage itself**. New SavaPage releases come from [savapa
 
 ## CUPS web page
 
-CUPS, the print system SavaPage prints through, has its own web page at `http://SERVER-IP:631`. It's handy for adding and checking printers.
+CUPS, the print system SavaPage prints through, has its own web page. **That's where you add printers**, and check them and their jobs.
 
-It's **off by default**: CUPS only accepts connections from the server itself, and port 631 is blocked. That follows SavaPage's recommendation, and it's why `SERVER-IP:631` shows nothing from another computer.
-
-**Turn it on.** Re-run the installer with `CUPS_WEB=1`. It skips the parts already done.
-
-**VM / physical machine:**
-
-```bash
-sudo CUPS_WEB=1 bash ~/savapage-easy-install/install-savapage.sh
-```
-
-**LXC container:**
-
-```bash
-CUPS_WEB=1 bash ~/savapage-easy-install/install-savapage.sh
-```
-
-This opens port 631 in the firewall, and tells CUPS to accept connections from your **local network only** (other networks are still refused).
+**On by default on a VM or physical machine,** for your **local network only**: CUPS refuses other networks, and its admin pages need a login. **Off by default in an LXC container**, whose `root` usually has no password to log in to CUPS with.
 
 **Use it:**
 
-1. Browse to `http://SERVER-IP:631` to see printers and jobs.
-2. To make changes, use the secure address **`https://SERVER-IP:631/admin`**. (On plain `http://`, the admin pages say *"Upgrade Required"*.) Accept the certificate warning, as with SavaPage.
-3. Log in:
-   - **VM / physical machine:** your own Linux user and password. When you run the installer with `sudo`, it adds you to the `lpadmin` group, which is allowed to manage printers.
-   - **LXC container:** `root` and the container's root password.
+1. Go to **`https://SERVER-IP:631/admin`** and accept the certificate warning, as with SavaPage. (On plain `http://`, the admin pages say *"Upgrade Required"*.)
+2. Log in with your **Linux user and password**: `ubuntu` (or `admin` on Debian) on a VM from `proxmox-vm.sh`, or your own user on a machine you installed by hand. The installer adds that user to the `lpadmin` group, which may manage printers.
+3. Click **Administration → Add Printer** and follow the steps. Then add the printer in SavaPage's admin web app (step 7).
 
-**Turn it off.** Re-run the installer **without** `CUPS_WEB=1`.
+**Close it when you're done adding printers, or open it again later,** with one command (no need to re-run the installer):
 
-**VM / physical machine:**
+| What | Command |
+|---|---|
+| Open it | `sudo savapage-cups on` |
+| Close it | `sudo savapage-cups off` |
+| Is it open? | `savapage-cups status` |
 
-```bash
-sudo bash ~/savapage-easy-install/install-savapage.sh
-```
+In an LXC container you're root, so leave out `sudo`. `on`/`off` also opens or closes port 631 in the firewall and updates the status screen. **Your choice is kept:** re-running the installer later doesn't change it back. To set it while installing instead, use `CUPS_WEB=0` or `CUPS_WEB=1`, or answer the menu's question.
 
-**LXC container:**
-
-```bash
-bash ~/savapage-easy-install/install-savapage.sh
-```
-
-That closes port 631 and returns CUPS to local-only.
-
-> Every time you run the installer, it sets this to match the option. Without `CUPS_WEB=1`, it closes the page again. To keep it open, include `CUPS_WEB=1` every time (together with any other options, e.g. `CUPS_WEB=1 HTTPS_REDIRECT=0`).
+**In a container,** `savapage-cups on` works, but CUPS needs a user with a password to log in with. Either give root a password (`passwd`), or add printers with commands instead, e.g. `lpadmin -p Office -E -v ipp://PRINTER-IP/ipp/print -m everywhere`.
 
 ## HTTPS redirect
 
@@ -762,7 +739,7 @@ On a VM, put `sudo` in front of each command.
 | "Invalid response" in the browser | You used `http://` with port 8632. Use `http://…:8631` or `https://…:8632`. |
 | Browser says "not private" | Normal for a self-signed certificate. Click *Advanced → Continue*. |
 | Web page doesn't load | Check the IP (`hostname -I`) and that SavaPage is running (`systemctl status savapage`). Check `ufw status`. Logs are in `/opt/savapage/server/logs/`. |
-| Nothing at `SERVER-IP:631` (CUPS page) | That's the default: CUPS only listens on the server itself. Turn it on with `CUPS_WEB=1`. See [CUPS web page](#cups-web-page). |
+| Nothing at `SERVER-IP:631` (CUPS page) | It's closed: the default in a container, or someone ran `savapage-cups off`. Open it with `sudo savapage-cups on`. Use `https://`, not `http://`, for the admin pages. See [CUPS web page](#cups-web-page). |
 | Printers don't show in SavaPage | Check CUPS sees them with `lpstat -p`. Make sure each one is shared: `lpadmin -p NAME -o printer-is-shared=true`. |
 | Forgot the admin password | See the [SavaPage manual](https://manual.savapage.org/). |
 | Forgot the VM login password | In the Proxmox host shell: `qm guest passwd VMID admin`. See [Logging in to the VM](#logging-in-to-the-vm). |

@@ -99,6 +99,8 @@ if (( ! NOTHING_INSTALLED )); then
   systemctl daemon-reload
 
   rm -f /etc/pam.d/savapage
+  rm -f /usr/local/sbin/savapage-cups
+  rm -rf /etc/savapage-easy-install
   # The console status screen (savapage-status.sh --install), if it was added.
   if [[ -x /usr/local/bin/savapage-status ]]; then
     /usr/local/bin/savapage-status --remove >/dev/null 2>&1 || true

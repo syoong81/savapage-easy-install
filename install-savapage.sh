@@ -16,8 +16,10 @@
 #   SKIP_FIREWALL=1              Do not configure ufw (you handle the firewall yourself)
 #   HTTPS_REDIRECT=0             Don't redirect web pages on http://...:8631 to https://...:8632
 #                                (default: 1 = redirect on; IPP printing is never redirected)
-#   CUPS_WEB=1                   Open the CUPS web interface (port 631) to the local network
-#                                (default: 0 = CUPS only reachable from the server itself)
+#   CUPS_WEB=0                   Keep the CUPS web interface (port 631, for adding printers)
+#                                local to the server. Default: 1 = open to the local network,
+#                                except in an LXC container (0). Your last choice is kept on
+#                                re-runs. Change it any time with: sudo savapage-cups on|off
 #   AUTO_UPDATES=0               Don't install updates automatically
 #                                (default: 1 = all updates every night, reboot only if needed)
 #   UPDATE_TIME=03:00            When the nightly updates run (24-hour clock, server time)
@@ -29,7 +31,8 @@ INSTALL_DIR="/opt/savapage"
 SAVAPAGE_USER="savapage"
 SAVAPAGE_VERSION="${SAVAPAGE_VERSION:-1.7.0-final}"
 HTTPS_REDIRECT="${HTTPS_REDIRECT:-1}"
-CUPS_WEB="${CUPS_WEB:-0}"
+CUPS_WEB="${CUPS_WEB:-}"                 # decided after the LXC check below
+CUPS_WEB_STATE=/etc/savapage-easy-install/cups-web   # the last choice (installer or savapage-cups)
 AUTO_UPDATES="${AUTO_UPDATES:-1}"
 UPDATE_TIME="${UPDATE_TIME:-03:00}"
 
@@ -87,6 +90,19 @@ if [[ "$(systemd-detect-virt -c 2>/dev/null || true)" == lxc* ]]; then
     warn "Some systemd units have failed. On Proxmox, make sure the container has 'nesting=1' (Options > Features)."
   fi
 fi
+
+# CUPS web page (needed to add printers): an explicit CUPS_WEB wins, then the last
+# choice saved by this script or 'savapage-cups', then the default: on, except in a
+# container (its root account usually has no password to log in to CUPS with).
+if [[ -z "$CUPS_WEB" ]]; then
+  if [[ -r "$CUPS_WEB_STATE" ]]; then
+    CUPS_WEB=$(tr -dc '01' < "$CUPS_WEB_STATE")
+  fi
+  if [[ -z "$CUPS_WEB" ]]; then
+    if (( IN_LXC )); then CUPS_WEB=0; else CUPS_WEB=1; fi
+  fi
+fi
+[[ "$CUPS_WEB" == 0 || "$CUPS_WEB" == 1 ]] || die "CUPS_WEB must be 0 or 1 (got '$CUPS_WEB')."
 
 # ---------------------------------------------------------------------------
 # 1. Packages
@@ -190,10 +206,72 @@ systemctl reset-failed cups.service cups.socket cups.path 2>/dev/null || true
 systemctl restart cups.service
 systemctl start cups.socket cups.path 2>/dev/null || true
 
-# Optional: CUPS web interface on the local network (off by default). CUPS itself
-# limits it to the local subnet (Allow @LOCAL), and admin pages still need a login.
+# 'savapage-cups on|off|status': open or close the CUPS web page later, without
+# re-running this script.
+cat > /usr/local/sbin/savapage-cups <<'EOF'
+#!/bin/bash
+# savapage-cups - open or close the CUPS web page (port 631), which you use to add
+# printers. Added by savapage-easy-install (install-savapage.sh).
+#   sudo savapage-cups on      open it to the local network (admin pages need a login)
+#   sudo savapage-cups off     close it again (CUPS only reachable from the server)
+#   savapage-cups status       show whether it's open
+set -uo pipefail
+STATE=/etc/savapage-easy-install/cups-web
+
+server_ip() { ip -4 route get 1.1.1.1 2>/dev/null | awk '{for (i = 1; i < NF; i++) if ($i == "src") {print $(i + 1); exit}}'; }
+is_open()   { /usr/sbin/cupsctl 2>/dev/null | grep -q '^_remote_admin=1'; }
+wait_cups() { for _ in $(seq 1 15); do (exec 3<>/dev/tcp/127.0.0.1/631) 2>/dev/null && return 0; sleep 1; done; return 1; }
+need_root() { [[ $EUID -eq 0 ]] || { echo "Run it with sudo: sudo savapage-cups $1" >&2; exit 1; }; }
+ufw_active() { command -v ufw >/dev/null && ufw status 2>/dev/null | grep -q '^Status: active'; }
+refresh_status_screen() { [[ -x /usr/local/bin/savapage-status ]] && /usr/local/bin/savapage-status --update-issue >/dev/null 2>&1 || true; }
+
+case "${1:-status}" in
+  on)
+    need_root on
+    # CUPS itself only lets the local subnet in (Allow @LOCAL).
+    /usr/sbin/cupsctl --remote-admin && wait_cups
+    if ufw_active; then ufw allow 631/tcp comment 'CUPS web interface' >/dev/null; fi
+    if [[ -n "${SUDO_USER:-}" && "$SUDO_USER" != root ]] && ! id -nG "$SUDO_USER" | grep -qw lpadmin; then
+      usermod -aG lpadmin "$SUDO_USER"
+      echo "Added '$SUDO_USER' to the lpadmin group, so it can log in to the CUPS admin pages."
+    fi
+    mkdir -p "$(dirname "$STATE")"; echo 1 > "$STATE"
+    refresh_status_screen
+    echo "CUPS web page is ON, for your local network only:"
+    echo "  https://$(server_ip):631/admin   (log in with your Linux user and password)"
+    echo "Close it again with: sudo savapage-cups off"
+    ;;
+  off)
+    need_root off
+    /usr/sbin/cupsctl --no-remote-admin --no-remote-any && wait_cups
+    if command -v ufw >/dev/null; then ufw delete allow 631/tcp >/dev/null 2>&1 || true; fi
+    mkdir -p "$(dirname "$STATE")"; echo 0 > "$STATE"
+    refresh_status_screen
+    echo "CUPS web page is OFF. CUPS is only reachable from the server itself."
+    echo "Open it again with: sudo savapage-cups on"
+    ;;
+  status)
+    if is_open; then
+      echo "CUPS web page is ON: https://$(server_ip):631/admin (local network only)"
+    else
+      echo "CUPS web page is OFF. Open it with: sudo savapage-cups on"
+    fi
+    ;;
+  *)
+    echo "Usage: savapage-cups on | off | status" >&2
+    exit 2
+    ;;
+esac
+EOF
+chmod 0755 /usr/local/sbin/savapage-cups
+mkdir -p "$(dirname "$CUPS_WEB_STATE")"
+echo "$CUPS_WEB" > "$CUPS_WEB_STATE"
+
+# CUPS web page on the local network (on by default, except in containers). CUPS
+# itself limits it to the local subnet (Allow @LOCAL), and admin pages need a login.
+# The firewall rule for port 631 is added in step 8.
 if [[ "$CUPS_WEB" == "1" ]]; then
-  log "Opening the CUPS web interface to the local network (CUPS_WEB=1)"
+  log "Opening the CUPS web page to the local network (to add printers)"
   cupsctl --remote-admin
   # cupsctl makes cupsd restart; wait until it answers again.
   for _ in $(seq 1 15); do
@@ -474,7 +552,8 @@ cat <<EOF
  AirPrint/IPP  : ipps://$HOST_IP:8632/printers/airprint
 
  HTTP redirect : $( [[ "$redirect_value" == true ]] && echo "on (http://$HOST_IP:8631 goes to HTTPS)" || echo "off" )
- CUPS web page : $( [[ "$CUPS_WEB" == 1 ]] && echo "on (http://$HOST_IP:631, local network only)" || echo "off (local only; CUPS_WEB=1 opens it)" )
+ CUPS web page : $( [[ "$CUPS_WEB" == 1 ]] && echo "on: https://$HOST_IP:631/admin (add printers here;" || echo "off (open it to add printers: sudo savapage-cups on)" )
+$( [[ "$CUPS_WEB" == 1 ]] && echo "                 local network only; close it: sudo savapage-cups off)" )
  Auto updates  : $( [[ "$AUTO_UPDATES" == 1 ]] && echo "on (every night at $UPDATE_TIME; reboots only if needed)" || echo "off (AUTO_UPDATES=1 turns them on)" )
 
  Your browser will warn about the self-signed certificate. That is

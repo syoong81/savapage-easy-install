@@ -47,7 +47,7 @@ sudo apt-get update && sudo apt-get install -y git
 git clone https://github.com/syoong81/savapage-easy-install.git ~/savapage-easy-install && sudo bash ~/savapage-easy-install/install-savapage.sh
 ```
 
-In a Proxmox LXC container's console you're root, so leave out `sudo`. Then open `http://SERVER-IP:8631/admin`, which redirects to HTTPS, log in as `admin` / `admin` and change the password.
+In a Proxmox LXC container's console you're root, so leave out `sudo`. Then open `http://SERVER-IP:8631/admin`, which redirects to HTTPS, log in as `admin` / `admin` and change the password. Add your printers in the CUPS web page at `https://SERVER-IP:631/admin` (on by default on a VM or physical machine; `sudo savapage-cups off` closes it).
 
 ## Supported systems
 
